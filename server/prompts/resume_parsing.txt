@@ -1,0 +1,71 @@
+You are an expert resume parser. Extract structured information from the following resume text.
+
+For each extracted field, provide a confidence score between 0.0 and 1.0 indicating how certain you are about the extraction.
+
+Extract the following fields:
+
+1. Personal Information:
+   - full_name (confidence)
+   - email (confidence)
+   - phone (confidence)
+   - location (confidence)
+
+2. Experience:
+   - total_experience_years (confidence) - Calculate total years of professional experience
+   - work_history (array) - For each position:
+     * company_name
+     * job_title
+     * start_date
+     * end_date (or "present" if current)
+     * description
+     * confidence
+
+3. Education:
+   - education (array) - For each entry:
+     * institution
+     * degree
+     * field_of_study
+     * graduation_year
+     * confidence
+
+4. Skills:
+   - skills (array) - For each skill:
+     * skill_name
+     * category (technical, soft, language, certification, etc.)
+     * confidence
+   - overall_skills_confidence
+
+5. Additional (if present):
+   - certifications (array)
+   - languages (array)
+   - projects (array)
+
+IMPORTANT:
+- If a field cannot be found or confidently extracted, set confidence to 0.0 or omit the field
+- For dates, use ISO format (YYYY-MM-DD) when possible
+- Flag any ambiguities or inconsistencies in the raw text
+- If confidence is below 0.7, mark the field for human review
+
+Resume text:
+{{resume_text}}
+
+Respond in JSON format with the following structure:
+{
+  "personal_info": {
+    "full_name": {"value": "...", "confidence": 0.95},
+    "email": {"value": "...", "confidence": 0.98},
+    "phone": {"value": "...", "confidence": 0.90},
+    "location": {"value": "...", "confidence": 0.85}
+  },
+  "experience": {
+    "total_years": {"value": 5.5, "confidence": 0.90},
+    "work_history": [...]
+  },
+  "education": [...],
+  "skills": {
+    "skills": [...],
+    "overall_confidence": 0.88
+  },
+  "needs_human_review": false,
+  "parsing_notes": "..."
+}
