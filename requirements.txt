@@ -4,12 +4,12 @@ uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 
 # Pydantic for data validation
-pydantic==2.5.0
-pydantic-settings==2.1.0
+pydantic==2.10.5
+pydantic-settings==2.7.1
 
 # Database
 sqlalchemy==2.0.23
-psycopg2-binary==2.9.9
+psycopg[binary]==3.2.3
 alembic==1.12.1
 
 # LLM providers
@@ -18,10 +18,10 @@ google-generativeai==0.3.1
 anthropic==0.7.8
 
 # Embeddings and vector search
-qdrant-client==1.6.4
+qdrant-client==1.18.0
 
-# Kafka
-confluent-kafka==2.3.0
+# Kafka (optional - only needed if KAFKA_ENABLED=true)
+# confluent-kafka==2.3.0  # Requires C++ build tools on Windows
 
 # HTTP client
 httpx==0.25.1

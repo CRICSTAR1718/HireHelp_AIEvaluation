@@ -13,19 +13,19 @@ class VectorClient:
     """
     
     def __init__(self):
-        self.provider = settings.EMBEDDING_PROVIDER
+        self.vector_backend = settings.VECTOR_BACKEND  # pgvector or qdrant
         self.dimension = settings.EMBEDDING_DIMENSION
         self._initialize_client()
     
     def _initialize_client(self):
         """Initialize the appropriate vector database client."""
-        if self.provider == "qdrant":
+        if self.vector_backend == "qdrant":
             self._init_qdrant()
-        elif self.provider == "pgvector":
+        elif self.vector_backend == "pgvector":
             self._init_pgvector()
         else:
             # For OpenAI-only embedding generation, we might not have a vector DB
-            logger.warning(f"No vector database configured for provider: {self.provider}")
+            logger.warning(f"No vector database configured for backend: {self.vector_backend}")
             self.client = None
     
     def _init_qdrant(self):
@@ -43,13 +43,14 @@ class VectorClient:
             raise EmbeddingError(f"Failed to initialize Qdrant client: {str(e)}")
     
     def _init_pgvector(self):
-        """Initialize pgvector client."""
+        """Initialize pgvector client using the same database engine as the app."""
         try:
-            import psycopg2
-            self.connection = psycopg2.connect(settings.PGVECTOR_CONNECTION_STRING)
-            logger.info("Initialized pgvector vector client")
+            # Use the existing database engine from config/db.py
+            from ..config.db import engine
+            self.engine = engine
+            logger.info("Initialized pgvector vector client using shared database engine")
         except ImportError:
-            raise EmbeddingError("psycopg2 package not installed")
+            raise EmbeddingError("Failed to import database engine")
         except Exception as e:
             raise EmbeddingError(f"Failed to initialize pgvector client: {str(e)}")
     
@@ -90,29 +91,29 @@ class VectorClient:
             logger.info(f"Created Qdrant collection: {collection_name}")
     
     def _create_pgvector_table(self, table_name: str):
-        """Create pgvector table."""
-        cursor = self.connection.cursor()
-        
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {table_name} (
-                id SERIAL PRIMARY KEY,
-                vector_id VARCHAR(255) UNIQUE NOT NULL,
-                embedding vector({self.dimension}),
-                metadata JSONB,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        """)
-        
-        # Create index for similarity search
-        cursor.execute(f"""
-            CREATE INDEX IF NOT EXISTS {table_name}_embedding_idx 
-            ON {table_name} 
-            USING ivfflat (embedding vector_cosine_ops)
-            WITH (lists = 100);
-        """)
-        
-        self.connection.commit()
-        logger.info(f"Created pgvector table: {table_name}")
+        """Create pgvector table using SQLAlchemy engine."""
+        with self.engine.connect() as conn:
+            # Create table
+            conn.execute(f"""
+                CREATE TABLE IF NOT EXISTS {table_name} (
+                    id SERIAL PRIMARY KEY,
+                    vector_id VARCHAR(255) UNIQUE NOT NULL,
+                    embedding vector({self.dimension}),
+                    metadata JSONB,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            
+            # Create index for similarity search
+            conn.execute(f"""
+                CREATE INDEX IF NOT EXISTS {table_name}_embedding_idx 
+                ON {table_name} 
+                USING ivfflat (embedding vector_cosine_ops)
+                WITH (lists = 100);
+            """)
+            
+            conn.commit()
+            logger.info(f"Created pgvector table: {table_name}")
     
     def insert_vectors(
         self,
@@ -175,24 +176,23 @@ class VectorClient:
         ids: List[str],
         metadata: Optional[List[Dict[str, Any]]]
     ):
-        """Insert vectors into pgvector."""
-        cursor = self.connection.cursor()
-        
-        for i, (vector, id_) in enumerate(zip(vectors, ids)):
-            meta = metadata[i] if metadata else {}
-            cursor.execute(
-                f"""
-                INSERT INTO {table_name} (vector_id, embedding, metadata)
-                VALUES (%s, %s::vector, %s::jsonb)
-                ON CONFLICT (vector_id) DO UPDATE SET
-                    embedding = EXCLUDED.embedding,
-                    metadata = EXCLUDED.metadata
-                """,
-                (id_, str(vector), meta)
-            )
-        
-        self.connection.commit()
-        logger.info(f"Inserted {len(vectors)} vectors into pgvector table: {table_name}")
+        """Insert vectors into pgvector using SQLAlchemy engine."""
+        with self.engine.connect() as conn:
+            for i, (vector, id_) in enumerate(zip(vectors, ids)):
+                meta = metadata[i] if metadata else {}
+                conn.execute(
+                    f"""
+                    INSERT INTO {table_name} (vector_id, embedding, metadata)
+                    VALUES (%s, %s::vector, %s::jsonb)
+                    ON CONFLICT (vector_id) DO UPDATE SET
+                        embedding = EXCLUDED.embedding,
+                        metadata = EXCLUDED.metadata
+                    """,
+                    (id_, str(vector), meta)
+                )
+            
+            conn.commit()
+            logger.info(f"Inserted {len(vectors)} vectors into pgvector table: {table_name}")
     
     def search_similar(
         self,
@@ -263,31 +263,30 @@ class VectorClient:
         limit: int,
         score_threshold: Optional[float]
     ) -> List[Dict[str, Any]]:
-        """Search pgvector for similar vectors."""
-        cursor = self.connection.cursor()
-        
-        query = f"""
-            SELECT vector_id, 1 - (embedding <=> %s::vector) as similarity, metadata
-            FROM {table_name}
-        """
-        
-        if score_threshold:
-            query += " WHERE 1 - (embedding <=> %s::vector) >= %s"
-            cursor.execute(query, (str(query_vector), score_threshold))
-        else:
-            query += " ORDER BY embedding <=> %s::vector LIMIT %s"
-            cursor.execute(query, (str(query_vector), limit))
-        
-        results = cursor.fetchall()
-        
-        return [
-            {
-                "id": row[0],
-                "score": row[1],
-                "metadata": row[2]
-            }
-            for row in results
-        ]
+        """Search pgvector for similar vectors using SQLAlchemy engine."""
+        with self.engine.connect() as conn:
+            query = f"""
+                SELECT vector_id, 1 - (embedding <=> %s::vector) as similarity, metadata
+                FROM {table_name}
+            """
+            
+            if score_threshold:
+                query += " WHERE 1 - (embedding <=> %s::vector) >= %s"
+                result = conn.execute(query, (str(query_vector), score_threshold))
+            else:
+                query += " ORDER BY embedding <=> %s::vector LIMIT %s"
+                result = conn.execute(query, (str(query_vector), limit))
+            
+            results = result.fetchall()
+            
+            return [
+                {
+                    "id": row[0],
+                    "score": row[1],
+                    "metadata": row[2]
+                }
+                for row in results
+            ]
     
     def delete_vector(self, collection_name: str, vector_id: str):
         """
@@ -297,23 +296,23 @@ class VectorClient:
             collection_name: Name of the collection
             vector_id: ID of the vector to delete
         """
-        if not self.client:
+        if not self.client and self.vector_backend != "pgvector":
             logger.warning("No vector client configured, skipping vector deletion")
             return
         
         try:
-            if self.provider == "qdrant":
+            if self.vector_backend == "qdrant":
                 self.client.delete(
                     collection_name=collection_name,
                     points_selector=[vector_id]
                 )
-            elif self.provider == "pgvector":
-                cursor = self.connection.cursor()
-                cursor.execute(
-                    f"DELETE FROM {collection_name} WHERE vector_id = %s",
-                    (vector_id,)
-                )
-                self.connection.commit()
+            elif self.vector_backend == "pgvector":
+                with self.engine.connect() as conn:
+                    conn.execute(
+                        f"DELETE FROM {collection_name} WHERE vector_id = %s",
+                        (vector_id,)
+                    )
+                    conn.commit()
             
             logger.info(f"Deleted vector {vector_id} from {collection_name}")
         except Exception as e:

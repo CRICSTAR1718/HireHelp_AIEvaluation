@@ -19,6 +19,12 @@ class KafkaProducer:
     
     def _initialize_producer(self):
         """Initialize Kafka producer."""
+        # Skip initialization if Kafka is disabled
+        if not settings.KAFKA_ENABLED:
+            logger.warning("Kafka is disabled (KAFKA_ENABLED=false), producer will not be initialized")
+            self._producer = None
+            return
+
         try:
             from confluent_kafka import Producer as ConfluentProducer
             
@@ -55,8 +61,21 @@ class KafkaProducer:
             key: Optional partition key
         
         Returns:
-            True if published successfully
+            True if published successfully (or logged when disabled)
         """
+        # If Kafka is disabled, log what would have been published
+        if not settings.KAFKA_ENABLED:
+            event = {
+                "event_type": event_type,
+                "timestamp": self._get_timestamp(),
+                "payload": payload
+            }
+            logger.info(
+                f"Kafka disabled - would publish event {event_type} to topic {topic}. "
+                f"Payload: {json.dumps(event)}"
+            )
+            return True
+        
         if not self._producer:
             logger.warning("Kafka producer not initialized, skipping event publish")
             return False

@@ -20,7 +20,10 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Set sqlalchemy URL from settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Use DATABASE_URL_MIGRATIONS (direct connection) for DDL operations
+# Fall back to DATABASE_URL if DATABASE_URL_MIGRATIONS is not set
+migration_url = settings.DATABASE_URL_MIGRATIONS or settings.DATABASE_URL
+config.set_main_option("sqlalchemy.url", migration_url)
 
 # Add your model's MetaData object here for 'autogenerate' support
 target_metadata = Base.metadata

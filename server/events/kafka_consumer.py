@@ -22,6 +22,12 @@ class KafkaConsumer:
     
     def _initialize_consumer(self):
         """Initialize Kafka consumer."""
+        # Skip initialization if Kafka is disabled
+        if not settings.KAFKA_ENABLED:
+            logger.warning("Kafka is disabled (KAFKA_ENABLED=false), consumer will not be initialized")
+            self._consumer = None
+            return
+
         try:
             from confluent_kafka import Consumer as ConfluentConsumer
             
@@ -62,6 +68,11 @@ class KafkaConsumer:
         Args:
             poll_timeout: Timeout in seconds for polling
         """
+        # If Kafka is disabled, log warning and return
+        if not settings.KAFKA_ENABLED:
+            logger.warning("Kafka is disabled (KAFKA_ENABLED=false), skipping consumer start")
+            return
+
         logger.info("Starting Kafka consumer...")
         
         try:

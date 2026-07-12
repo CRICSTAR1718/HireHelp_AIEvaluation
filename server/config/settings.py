@@ -9,7 +9,8 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     
     # Database
-    DATABASE_URL: str
+    DATABASE_URL: str  # Transaction pooler connection (PgBouncer port 6543) for running app
+    DATABASE_URL_MIGRATIONS: Optional[str] = None  # Direct connection (port 5432) for Alembic DDL
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 20
     
@@ -25,6 +26,7 @@ class Settings(BaseSettings):
     
     # Embeddings
     EMBEDDING_PROVIDER: str = "openai"  # openai, qdrant, pgvector
+    VECTOR_BACKEND: str = "pgvector"  # pgvector or qdrant
     EMBEDDING_MODEL: str = "text-embedding-3-small"
     EMBEDDING_DIMENSION: int = 1536
     QDRANT_URL: Optional[str] = None
@@ -32,6 +34,7 @@ class Settings(BaseSettings):
     PGVECTOR_CONNECTION_STRING: Optional[str] = None
     
     # Kafka
+    KAFKA_ENABLED: bool = False  # Set to true to enable Kafka event publishing/consuming
     KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"
     KAFKA_GROUP_ID: str = "ai-evaluation-service"
     KAFKA_AUTO_OFFSET_RESET: str = "earliest"
