@@ -2,7 +2,7 @@ from fastapi import Request
 import logging
 import time
 from typing import Callable
-from ..config.settings import settings
+from server.config.settings import settings
 
 logger = logging.getLogger(__name__)
 

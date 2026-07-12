@@ -1,8 +1,8 @@
 from fastapi import APIRouter
-from typing import Dict
+from typing import Dict, Any
 from sqlalchemy import text
-from config.db import engine
-from config.settings import settings
+from server.config.db import engine
+from server.config.settings import settings
 import logging
 
 logger = logging.getLogger(__name__)
@@ -11,7 +11,7 @@ router = APIRouter()
 
 
 @router.get("/health")
-async def health_check() -> Dict[str, any]:
+async def health_check() -> Dict[str, Any]:
     """
     Health check endpoint.
     Returns service status and dependency health.

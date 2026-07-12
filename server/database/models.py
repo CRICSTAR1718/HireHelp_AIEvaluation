@@ -1,7 +1,7 @@
 from sqlalchemy import Column, String, Float, Integer, DateTime, Text, JSON, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from config.db import Base
+from server.config.db import Base
 
 
 class ParsedResume(Base):

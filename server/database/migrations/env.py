@@ -9,8 +9,13 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from config.settings import settings
-from config.db import Base
+from sqlalchemy.ext.declarative import declarative_base
+
+# Import models for autogenerate - but don't import config.db to avoid engine creation
 from database.models import *  # Import all models
+
+# Create Base declarative class for metadata
+Base = declarative_base()
 
 # this is the Alembic Config object
 config = context.config
@@ -22,7 +27,9 @@ if config.config_file_name is not None:
 # Set sqlalchemy URL from settings
 # Use DATABASE_URL_MIGRATIONS (direct connection) for DDL operations
 # Fall back to DATABASE_URL if DATABASE_URL_MIGRATIONS is not set
+# Convert to psycopg dialect for psycopg3
 migration_url = settings.DATABASE_URL_MIGRATIONS or settings.DATABASE_URL
+migration_url = migration_url.replace("postgresql://", "postgresql+psycopg://")
 config.set_main_option("sqlalchemy.url", migration_url)
 
 # Add your model's MetaData object here for 'autogenerate' support

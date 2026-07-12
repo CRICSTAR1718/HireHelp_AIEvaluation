@@ -1,16 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from config.settings import settings
-from config.db import engine, Base
-from common.middleware.logging import setup_logging, log_requests
-from common.middleware.error_handler import (
+from server.config.settings import settings
+from server.config.db import engine, Base
+from server.common.middleware.logging import setup_logging, log_requests
+from server.common.middleware.error_handler import (
     http_exception_handler_middleware,
     validation_exception_handler,
     service_exception_handler,
     general_exception_handler
 )
-from common.exceptions import AIServiceException
+from server.common.exceptions import AIServiceException
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import logging
@@ -73,29 +73,29 @@ app.add_exception_handler(AIServiceException, service_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
 
 # Include routers
-from health import router as health_router
+from server.health import router as health_router
 app.include_router(health_router, tags=["Health"])
 
 # Feature routers
-from resume_parser.router import router as resume_parser_router
+from server.resume_parser.router import router as resume_parser_router
 app.include_router(resume_parser_router, prefix="/api/v1/resume-parser", tags=["Resume Parser"])
 
-from resume_screening.router import router as resume_screening_router
+from server.resume_screening.router import router as resume_screening_router
 app.include_router(resume_screening_router, prefix="/api/v1/resume-screening", tags=["Resume Screening"])
 
-from fitment_score.router import router as fitment_score_router
+from server.fitment_score.router import router as fitment_score_router
 app.include_router(fitment_score_router, prefix="/api/v1/fitment-score", tags=["Fitment Score"])
 
-from ai_interview.router import router as ai_interview_router
+from server.ai_interview.router import router as ai_interview_router
 app.include_router(ai_interview_router, prefix="/api/v1/ai-interview", tags=["AI Interview"])
 
-from jd_matching.router import router as jd_matching_router
+from server.jd_matching.router import router as jd_matching_router
 app.include_router(jd_matching_router, prefix="/api/v1/jd-matching", tags=["Job Description Matching"])
 
-from skill_extraction.router import router as skill_extraction_router
+from server.skill_extraction.router import router as skill_extraction_router
 app.include_router(skill_extraction_router, prefix="/api/v1/skill-extraction", tags=["Skill Extraction"])
 
-from answer_evaluation.router import router as answer_evaluation_router
+from server.answer_evaluation.router import router as answer_evaluation_router
 app.include_router(answer_evaluation_router, prefix="/api/v1/answer-evaluation", tags=["Answer Evaluation"])
 
 

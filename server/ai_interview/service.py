@@ -1,7 +1,7 @@
 import time
 import logging
 import uuid
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
 from ..llm.client import LLMClient
 from ..config.settings import settings
