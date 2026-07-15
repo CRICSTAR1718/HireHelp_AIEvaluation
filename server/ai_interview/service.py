@@ -256,4 +256,3 @@ class AIInterviewService:
             db_interview.total_duration_ms = int((interview["completed_at"] - interview["started_at"]).total_seconds() * 1000)
             
             db.commit()
-    
