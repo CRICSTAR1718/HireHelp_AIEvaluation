@@ -95,6 +95,13 @@ app.include_router(skill_extraction_router, prefix="/api/v1/skill-extraction", t
 from server.answer_evaluation.router import router as answer_evaluation_router
 app.include_router(answer_evaluation_router, prefix="/api/v1/answer-evaluation", tags=["Answer Evaluation"])
 
+from server.evaluation.router import router as evaluation_router
+
+app.include_router(
+    evaluation_router,
+    prefix="/api/v1/evaluation",
+    tags=["Evaluation"]
+)
 
 @app.get("/")
 async def root():

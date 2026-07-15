@@ -9,6 +9,7 @@ from ..llm.client import LLMClient
 from ..config.settings import settings
 from ..common.exceptions import LLMProviderError
 from ..database.models import FitmentScore
+from ..resume_parser.schema import ParsedResumeResponse
 from .schema import CalculateFitmentRequest, FitmentScoreResponse
 from .scoring_engine import ScoringEngine, DimensionScore
 
@@ -285,3 +286,76 @@ class FitmentScoreService:
         except Exception as e:
             logger.error(f"Failed to retrieve fitment score {score_id}: {str(e)}")
             raise
+
+    async def calculate_fitment_from_parsed_resume(
+        self,
+        parsed_resume: ParsedResumeResponse,
+        job_description: str,
+        job_id: str,
+        candidate_id: str,
+        resume_id: str,
+        db: Optional[Session] = None
+    ) -> FitmentScoreResponse:
+        """
+        Calculate fitment score from a parsed resume response.
+        
+        This method extracts the necessary data from ParsedResumeResponse and
+        internally constructs the CalculateFitmentRequest, keeping the
+        recruitment service unaware of AI-specific structures.
+        
+        Args:
+            parsed_resume: Parsed resume data from ResumeParserService
+            job_description: Job description text
+            job_id: Job identifier
+            candidate_id: Candidate identifier
+            resume_id: Resume identifier
+            db: Database session
+        
+        Returns:
+            FitmentScoreResponse with detailed scores and reasoning
+        """
+        # Extract skills from parsed resume
+        candidate_skills = [skill.skill_name for skill in parsed_resume.skills.skills]
+        
+        # Extract experience years
+        candidate_experience_years = parsed_resume.experience.total_years.value or 0.0
+        
+        # Extract education
+        candidate_education = [
+            {
+                "institution": edu.institution,
+                "degree": edu.degree,
+                "field_of_study": edu.field_of_study,
+                "graduation_year": edu.graduation_year
+            }
+            for edu in parsed_resume.education
+        ]
+        
+        # Extract work history for relevant experience
+        relevant_experience = [
+            {
+                "company": entry.company_name,
+                "title": entry.job_title,
+                "start_date": entry.start_date,
+                "end_date": entry.end_date,
+                "description": entry.description
+            }
+            for entry in parsed_resume.experience.work_history
+        ]
+        
+        # Build the internal request
+        request = CalculateFitmentRequest(
+            candidate_id=candidate_id,
+            job_id=job_id,
+            resume_id=resume_id,
+            job_description=job_description,
+            candidate_skills=candidate_skills,
+            required_skills=[],  # Will be extracted from job_description by LLM
+            candidate_experience_years=candidate_experience_years,
+            required_experience_years=0,  # Will be extracted from job_description by LLM
+            candidate_education=candidate_education,
+            relevant_experience=relevant_experience
+        )
+        
+        # Call the existing calculate_fitment method
+        return await self.calculate_fitment(request, db)
