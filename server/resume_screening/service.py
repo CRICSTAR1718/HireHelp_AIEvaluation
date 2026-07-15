@@ -8,7 +8,6 @@ from ..llm.client import LLMClient
 from ..config.settings import settings
 from ..common.exceptions import LLMProviderError
 from ..database.models import ScreenedResume, ParsedResume
-from ..events.kafka_producer import get_kafka_producer
 from .schema import (
     ScreenedResumeResponse, CriteriaMatch, 
     ScreenResumeRequest
@@ -177,26 +176,6 @@ Respond in JSON format:
         
         return db_screening
     
-    def _publish_event(self, screened_response: ScreenedResumeResponse):
-        """Publish ResumeScreened event to Kafka."""
-        try:
-            producer = get_kafka_producer()
-            producer.publish_event(
-                topic="resume-screened",
-                event_type="ResumeScreened",
-                payload={
-                    "screening_id": screened_response.id,
-                    "resume_id": screened_response.resume_id,
-                    "job_id": screened_response.job_id,
-                    "meets_requirements": screened_response.meets_requirements,
-                    "screening_score": screened_response.screening_score,
-                    "screening_timestamp": screened_response.screening_timestamp.isoformat()
-                },
-                key=screened_response.id
-            )
-        except Exception as e:
-            logger.error(f"Failed to publish ResumeScreened event: {str(e)}")
-    
     async def screen_resume(
         self,
         resume_id: str,
@@ -264,9 +243,6 @@ Respond in JSON format:
             
             # Save to database
             self._save_to_database(db, screened_response)
-            
-            # Publish event
-            self._publish_event(screened_response)
             
             logger.info(f"Successfully screened resume {resume_id} against job {job_id}")
             return screened_response

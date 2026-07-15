@@ -20,9 +20,6 @@ anthropic==0.7.8
 # Embeddings and vector search
 qdrant-client==1.18.0
 
-# Kafka (optional - only needed if KAFKA_ENABLED=true)
-# confluent-kafka==2.3.0  # Requires C++ build tools on Windows
-
 # HTTP client
 httpx==0.25.1
 

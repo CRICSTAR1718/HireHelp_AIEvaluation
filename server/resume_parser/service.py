@@ -8,7 +8,6 @@ from ..llm.client import LLMClient
 from ..config.settings import settings
 from ..common.exceptions import LLMProviderError, ConfidenceThresholdError
 from ..database.models import ParsedResume
-from ..events.kafka_producer import get_kafka_producer
 from .schema import (
     ParsedResumeResponse, PersonalInfo, Experience, 
     EducationEntry, SkillEntry, Skills, ConfidenceField,
@@ -153,24 +152,6 @@ class ResumeParserService:
         
         return db_resume
     
-    def _publish_event(self, parsed_response: ParsedResumeResponse):
-        """Publish ResumeParsed event to Kafka."""
-        try:
-            producer = get_kafka_producer()
-            producer.publish_event(
-                topic="resume-parsed",
-                event_type="ResumeParsed",
-                payload={
-                    "resume_id": parsed_response.id,
-                    "candidate_id": parsed_response.candidate_id,
-                    "needs_human_review": parsed_response.needs_human_review,
-                    "parsing_timestamp": parsed_response.parsing_timestamp.isoformat()
-                },
-                key=parsed_response.id
-            )
-        except Exception as e:
-            logger.error(f"Failed to publish ResumeParsed event: {str(e)}")
-    
     async def parse_resume(
         self,
         resume_id: str,
@@ -231,9 +212,6 @@ class ResumeParserService:
             # Save to database if session provided
             if db:
                 self._save_to_database(db, parsed_response)
-            
-            # Publish event
-            self._publish_event(parsed_response)
             
             logger.info(f"Successfully parsed resume {resume_id} for candidate {candidate_id}")
             return parsed_response

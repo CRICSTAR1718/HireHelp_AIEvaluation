@@ -5,7 +5,7 @@ Paste this at the top of the repo (e.g. `AGENTS.md` or `CLAUDE.md`) so any AI ag
 ---
 
 ### Scope of this repo
-This repo owns the **AI/LLM domain only**: resume parsing, resume screening, JD/skill matching, fitment scoring, and the AI-driven interview. It does **not** own candidate profiles, job requisitions, interview scheduling, or notifications — those live in `candidate-service`, `recruitment-service`, `interview-service`, and `communication-service` respectively. If a task needs data from one of those domains, call that service's API or consume/publish a Kafka event — never duplicate its logic or query its database here.
+This repo owns the **AI/LLM domain only**: resume parsing, resume screening, JD/skill matching, fitment scoring, and the AI-driven interview. It does **not** own candidate profiles, job requisitions, interview scheduling, or notifications — those live in `candidate-service`, `recruitment-service`, `interview-service`, and `communication-service` respectively. If a task needs data from one of those domains, call that service's API — never duplicate its logic or query its database here.
 
 This is the **only Python service** in the platform. Every other service is Express + TypeScript — don't import patterns from those repos, and don't let this repo's conventions leak into them.
 
@@ -67,8 +67,6 @@ ai-evaluation-service/
 │   │   ├── embedding_service.py
 │   │   └── vector_client.py          pgvector or Qdrant, behind one interface
 │   ├── events/
-│   │   ├── kafka_producer.py
-│   │   ├── kafka_consumer.py
 │   │   └── handlers/
 │   │       └── resume_uploaded_handler.py
 │   ├── health.py                     GET /health
@@ -92,15 +90,8 @@ Every feature = `router.py` (routes only, no business logic) + `service.py` (log
 - This service is called by other Node services over internal HTTP (e.g. `recruitment-service` triggering a fitment sweep) — keep internal endpoints documented in `README.md` separately from any public-facing ones the gateway proxies.
 - Don't change an existing endpoint's request/response shape without checking `recruitment-service`'s and `candidate-service`'s HTTP clients that call this service.
 
-### Kafka events
-- **Publishes:** `ResumeParsed`, `ResumeScreened`, `FitmentScoreCalculated`, `AIInterviewCompleted`
-- **Consumes:** `ResumeUploaded` (from candidate-service) — triggers the parsing pipeline
-- Event payloads are the contract — don't change a published event's shape without checking every consumer (`recruitment-service`, `interview-service`, `talent-service`, `analytics-service`).
-- All event handling goes in `events/`, not scattered into feature modules.
-
 ### Do not modify without team approval
 - `database/models.py` structure
-- Kafka event names/payload shapes
 - `llm/client.py`'s provider interface (other modules depend on its method signatures)
 - Fitment scoring weights in `fitment_score/scoring_engine.py` — changing these changes every candidate's score platform-wide, coordinate before touching
 - Folder structure above
@@ -116,5 +107,4 @@ Every feature = `router.py` (routes only, no business logic) + `service.py` (log
 - `pytest` passes locally, with LLM calls mocked
 - New/changed routes reflected in the service's README and FastAPI's auto-generated OpenAPI docs
 - No `.env` values or API keys committed
-- If a Kafka event was added or changed, ping the team — don't assume other services will auto-adapt
 - If a prompt was changed, note what changed and why in the PR description — prompt changes are effectively logic changes and should be reviewable as such

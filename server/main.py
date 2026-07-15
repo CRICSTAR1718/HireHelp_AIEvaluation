@@ -37,9 +37,6 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"Failed to create database tables: {str(e)}")
     
-    # Initialize Kafka consumer if needed
-    # This would typically run in a background task
-    
     yield
     
     # Shutdown

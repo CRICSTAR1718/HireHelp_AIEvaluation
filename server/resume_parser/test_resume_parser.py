@@ -29,7 +29,7 @@ def client():
 
 class TestResumeParserService:
     """Tests for ResumeParserService."""
-    
+
     @patch('resume_parser.service.LLMClient')
     def test_parse_resume_success(self, mock_llm_client, parser_service, mock_db):
         """Test successful resume parsing."""
@@ -61,26 +61,21 @@ class TestResumeParserService:
             "latency_ms": 1500,
             "token_usage": {"total_tokens": 500}
         }
-        
-        # Mock Kafka producer
-        with patch('resume_parser.service.get_kafka_producer') as mock_producer:
-            mock_producer_instance = Mock()
-            mock_producer.return_value = mock_producer_instance
-            mock_producer_instance.publish_event.return_value = True
-            
-            result = parser_service.parse_resume(
-                resume_id="resume_123",
-                candidate_id="candidate_456",
-                file_url="http://example.com/resume.pdf",
-                db=mock_db
-            )
-            
-            assert isinstance(result, ParsedResumeResponse)
-            assert result.id == "resume_123"
-            assert result.candidate_id == "candidate_456"
-            assert result.personal_info.full_name.value == "John Doe"
-            assert result.personal_info.full_name.confidence == 0.95
-    
+
+
+        result = parser_service.parse_resume(
+            resume_id="resume_123",
+            candidate_id="candidate_456",
+            file_url="http://example.com/resume.pdf",
+            db=mock_db
+        )
+
+        assert isinstance(result, ParsedResumeResponse)
+        assert result.id == "resume_123"
+        assert result.candidate_id == "candidate_456"
+        assert result.personal_info.full_name.value == "John Doe"
+        assert result.personal_info.full_name.confidence == 0.95
+
     @patch('resume_parser.service.LLMClient')
     def test_parse_resume_low_confidence(self, mock_llm_client, parser_service, mock_db):
         """Test resume parsing with low confidence fields."""
@@ -111,33 +106,29 @@ class TestResumeParserService:
             "latency_ms": 1500,
             "token_usage": {"total_tokens": 500}
         }
-        
-        with patch('resume_parser.service.get_kafka_producer') as mock_producer:
-            mock_producer_instance = Mock()
-            mock_producer.return_value = mock_producer_instance
-            mock_producer_instance.publish_event.return_value = True
-            
-            result = parser_service.parse_resume(
-                resume_id="resume_123",
-                candidate_id="candidate_456",
-                file_url="http://example.com/resume.pdf",
-                db=mock_db
-            )
-            
-            # Should flag for human review due to low confidence
-            assert result.needs_human_review == True
-    
+
+
+        result = parser_service.parse_resume(
+            resume_id="resume_123",
+            candidate_id="candidate_456",
+            file_url="http://example.com/resume.pdf",
+            db=mock_db
+        )
+
+        # Should flag for human review due to low confidence
+        assert result.needs_human_review == True
+
     def test_get_parsed_resume_not_found(self, parser_service, mock_db):
         """Test retrieving non-existent parsed resume."""
         mock_db.query.return_value.filter.return_value.first.return_value = None
-        
+
         result = parser_service.get_parsed_resume("nonexistent_id", mock_db)
         assert result is None
 
 
 class TestResumeParserRouter:
     """Tests for resume parser router."""
-    
+
     @patch('resume_parser.router.parser_service')
     @patch('resume_parser.router.verify_service_token')
     def test_parse_resume_endpoint(self, mock_auth, mock_service, client):
@@ -147,7 +138,7 @@ class TestResumeParserRouter:
             id="resume_123",
             candidate_id="candidate_456"
         )
-        
+
         response = client.post(
             "/api/v1/resume-parser/parse",
             json={
@@ -157,10 +148,10 @@ class TestResumeParserRouter:
             },
             headers={"Authorization": "Bearer test_token"}
         )
-        
+
         # Note: This will fail until router is registered in main.py
         # For now, this is a placeholder test
-    
+
     @patch('resume_parser.router.parser_service')
     @patch('resume_parser.router.verify_service_token')
     def test_get_parsed_resume_endpoint(self, mock_auth, mock_service, client):
@@ -170,11 +161,11 @@ class TestResumeParserRouter:
             id="resume_123",
             candidate_id="candidate_456"
         )
-        
+
         response = client.get(
             "/api/v1/resume-parser/resume_123",
             headers={"Authorization": "Bearer test_token"}
         )
-        
+
         # Note: This will fail until router is registered in main.py
         # For now, this is a placeholder test

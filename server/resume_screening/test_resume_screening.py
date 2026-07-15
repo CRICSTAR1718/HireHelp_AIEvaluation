@@ -48,13 +48,13 @@ def mock_parsed_resume():
 
 class TestResumeScreeningService:
     """Tests for ResumeScreeningService."""
-    
+
     @patch('resume_screening.service.LLMClient')
     def test_screen_resume_success(self, mock_llm_client, screening_service, mock_db, mock_parsed_resume):
         """Test successful resume screening."""
         # Mock database query
         mock_db.query.return_value.filter.return_value.first.return_value = mock_parsed_resume
-        
+
         # Mock LLM response
         mock_llm_instance = Mock()
         mock_llm_client.return_value = mock_llm_instance
@@ -83,42 +83,37 @@ class TestResumeScreeningService:
             "latency_ms": 1200,
             "token_usage": {"total_tokens": 400}
         }
-        
-        # Mock Kafka producer
-        with patch('resume_screening.service.get_kafka_producer') as mock_producer:
-            mock_producer_instance = Mock()
-            mock_producer.return_value = mock_producer_instance
-            mock_producer_instance.publish_event.return_value = True
-            
-            result = screening_service.screen_resume(
-                resume_id="resume_123",
-                job_id="job_456",
-                job_description="Software Engineer position",
-                required_skills=["Python", "JavaScript"],
-                required_experience_years=3.0,
-                db=mock_db
-            )
-            
-            assert isinstance(result, ScreenedResumeResponse)
-            assert result.resume_id == "resume_123"
-            assert result.job_id == "job_456"
-            assert result.meets_requirements == True
-            assert result.screening_score == 0.85
-            assert len(result.criteria_match) == 2
-    
+
+
+        result = screening_service.screen_resume(
+            resume_id="resume_123",
+            job_id="job_456",
+            job_description="Software Engineer position",
+            required_skills=["Python", "JavaScript"],
+            required_experience_years=3.0,
+            db=mock_db
+        )
+
+        assert isinstance(result, ScreenedResumeResponse)
+        assert result.resume_id == "resume_123"
+        assert result.job_id == "job_456"
+        assert result.meets_requirements == True
+        assert result.screening_score == 0.85
+        assert len(result.criteria_match) == 2
+
     def test_get_screening_not_found(self, screening_service, mock_db):
         """Test retrieving non-existent screening."""
         mock_db.query.return_value.filter.return_value.first.return_value = None
-        
+
         result = screening_service.get_screening("nonexistent_id", mock_db)
         assert result is None
-    
+
     def test_get_resume_text(self, screening_service, mock_db, mock_parsed_resume):
         """Test resume text construction."""
         mock_db.query.return_value.filter.return_value.first.return_value = mock_parsed_resume
-        
+
         text = screening_service._get_resume_text("resume_123", mock_db)
-        
+
         assert "John Doe" in text
         assert "Python" in text
         assert "Software Engineer" in text

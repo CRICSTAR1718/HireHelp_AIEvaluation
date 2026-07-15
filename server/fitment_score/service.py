@@ -9,7 +9,6 @@ from ..llm.client import LLMClient
 from ..config.settings import settings
 from ..common.exceptions import LLMProviderError
 from ..database.models import FitmentScore
-from ..events.kafka_producer import get_kafka_producer
 from .schema import CalculateFitmentRequest, FitmentScoreResponse
 from .scoring_engine import ScoringEngine, DimensionScore
 
@@ -188,25 +187,6 @@ class FitmentScoreService:
         
         return db_score
     
-    def _publish_event(self, fitment_response: FitmentScoreResponse):
-        """Publish FitmentScoreCalculated event to Kafka."""
-        try:
-            producer = get_kafka_producer()
-            producer.publish_event(
-                topic="fitment-score-calculated",
-                event_type="FitmentScoreCalculated",
-                payload={
-                    "score_id": fitment_response.id,
-                    "candidate_id": fitment_response.candidate_id,
-                    "job_id": fitment_response.job_id,
-                    "overall_score": fitment_response.overall_score,
-                    "scoring_timestamp": fitment_response.scoring_timestamp.isoformat()
-                },
-                key=fitment_response.id
-            )
-        except Exception as e:
-            logger.error(f"Failed to publish FitmentScoreCalculated event: {str(e)}")
-    
     async def calculate_fitment(
         self,
         request: CalculateFitmentRequest,
@@ -251,9 +231,6 @@ class FitmentScoreService:
             # Save to database
             if db:
                 self._save_to_database(db, fitment_response)
-            
-            # Publish event
-            self._publish_event(fitment_response)
             
             logger.info(f"Successfully calculated fitment score {score_id}")
             return fitment_response

@@ -21,7 +21,6 @@ It does **not** own candidate profiles, job requisitions, interview scheduling, 
 - **LangChain/LangGraph** - LLM orchestration
 - **OpenAI/Gemini/Claude** - LLM providers
 - **Qdrant/pgvector** - Vector embeddings
-- **Kafka** - Event streaming
 - **pytest** - Testing
 
 ## Project Structure
@@ -43,7 +42,6 @@ ai-evaluation-service/
 │   ├── llm/                    # LLM client wrapper
 │   ├── prompts/                # Prompt templates
 │   ├── embeddings/             # Embedding service
-│   ├── events/                 # Kafka events
 │   ├── health.py               # Health check endpoint
 │   └── main.py                 # FastAPI application
 ├── requirements.txt
@@ -58,7 +56,6 @@ ai-evaluation-service/
 
 - Python 3.11+
 - PostgreSQL 14+
-- Kafka (or use docker-compose)
 - OpenAI/Gemini/Claude API key
 
 ### Installation
@@ -138,17 +135,6 @@ These endpoints are called by other services over internal HTTP:
 - `POST /api/v1/answer-evaluation/evaluate` - Evaluate an interview answer using AI
 - `GET /api/v1/answer-evaluation/{evaluation_id}` - Get answer evaluation result
 
-## Kafka Events
-
-### Published Events
-- `ResumeParsed` - Emitted when resume parsing completes
-- `ResumeScreened` - Emitted when resume screening completes
-- `FitmentScoreCalculated` - Emitted when fitment score is calculated
-- `AIInterviewCompleted` - Emitted when AI interview completes
-
-### Consumed Events
-- `ResumeUploaded` (from candidate-service) - Triggers parsing pipeline
-
 ## Development
 
 ### Running Tests
@@ -191,7 +177,6 @@ Each feature should follow the pattern:
 - `pytest` passes locally, with LLM calls mocked
 - New/changed routes reflected in README and OpenAPI docs
 - No `.env` values or API keys committed
-- If Kafka event was added/changed, ping the team
 - If prompt was changed, note what changed and why in PR description
 
 ## License

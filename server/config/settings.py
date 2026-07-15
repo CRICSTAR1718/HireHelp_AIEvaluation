@@ -33,13 +33,7 @@ class Settings(BaseSettings):
     QDRANT_API_KEY: Optional[str] = None
     PGVECTOR_CONNECTION_STRING: Optional[str] = None
     
-    # Kafka
-    KAFKA_ENABLED: bool = False  # Set to true to enable Kafka event publishing/consuming
-    KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"
-    KAFKA_GROUP_ID: str = "ai-evaluation-service"
-    KAFKA_AUTO_OFFSET_RESET: str = "earliest"
-    
-    # JWT/Auth
+# JWT/Auth
     JWT_SECRET_KEY: Optional[str] = None
     JWT_ALGORITHM: str = "HS256"
     SERVICE_TOKEN: Optional[str] = None

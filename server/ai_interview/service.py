@@ -7,7 +7,6 @@ from ..llm.client import LLMClient
 from ..config.settings import settings
 from ..common.exceptions import LLMProviderError
 from ..database.models import AIInterview, ParsedResume
-from ..events.kafka_producer import get_kafka_producer
 from .schema import StartInterviewRequest, SubmitAnswerRequest, InterviewResponse, Question
 from .question_generator import QuestionGenerator
 from .conversation_manager import ConversationManager, InterviewStatus
@@ -155,7 +154,6 @@ class AIInterviewService:
             # Update database if interview is complete
             if db and interview["status"] == InterviewStatus.COMPLETED:
                 self._update_database_completion(db, request.interview_id, interview)
-                self._publish_completion_event(request.interview_id, interview)
             
             # Get interview state
             interview_state = self.conversation_manager.get_interview_state(request.interview_id)
@@ -259,21 +257,3 @@ class AIInterviewService:
             
             db.commit()
     
-    def _publish_completion_event(self, interview_id: str, interview: Dict[str, Any]):
-        """Publish AIInterviewCompleted event to Kafka."""
-        try:
-            producer = get_kafka_producer()
-            producer.publish_event(
-                topic="ai-interview-completed",
-                event_type="AIInterviewCompleted",
-                payload={
-                    "interview_id": interview_id,
-                    "candidate_id": interview["candidate_id"],
-                    "job_id": interview["job_id"],
-                    "status": interview["status"],
-                    "completed_at": interview["completed_at"].isoformat() if interview["completed_at"] else None
-                },
-                key=interview_id
-            )
-        except Exception as e:
-            logger.error(f"Failed to publish AIInterviewCompleted event: {str(e)}")

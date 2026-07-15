@@ -31,11 +31,6 @@ class DatabaseError(AIServiceException):
     pass
 
 
-class KafkaError(AIServiceException):
-    """Raised when Kafka operations fail."""
-    pass
-
-
 def http_exception_handler(exc: AIServiceException) -> HTTPException:
     """Convert service exceptions to HTTP exceptions."""
     if isinstance(exc, LLMProviderError):
@@ -62,11 +57,6 @@ def http_exception_handler(exc: AIServiceException) -> HTTPException:
         return HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Database error: {str(exc)}"
-        )
-    elif isinstance(exc, KafkaError):
-        return HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Kafka error: {str(exc)}"
         )
     else:
         return HTTPException(

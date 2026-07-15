@@ -24,16 +24,6 @@ def mock_llm_client():
 
 
 @pytest.fixture
-def mock_kafka_producer():
-    """Mock Kafka producer for all tests."""
-    with patch('events.kafka_producer.get_kafka_producer') as mock:
-        mock_instance = Mock()
-        mock.return_value = mock_instance
-        mock_instance.publish_event.return_value = True
-        yield mock_instance
-
-
-@pytest.fixture
 def sample_parsed_resume():
     """Sample parsed resume data."""
     return {
