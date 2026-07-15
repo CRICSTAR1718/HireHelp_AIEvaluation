@@ -5,7 +5,7 @@ from datetime import datetime
 
 class ConfidenceField(BaseModel):
     """A field with an associated confidence score."""
-    value: Optional[str] = None
+    value: Optional[str | float] = None
     confidence: float = Field(ge=0.0, le=1.0)
 
 

@@ -1,10 +1,10 @@
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import AsyncMock, Mock, patch, MagicMock
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from resume_parser.service import ResumeParserService
-from resume_parser.schema import ParsedResumeResponse, ParseResumeRequest
-from resume_parser.router import router
+from server.resume_parser.service import ResumeParserService
+from server.resume_parser.schema import ParsedResumeResponse, ParseResumeRequest
+from server.resume_parser.router import router
 from fastapi.testclient import TestClient
 
 
@@ -30,8 +30,9 @@ def client():
 class TestResumeParserService:
     """Tests for ResumeParserService."""
 
-    @patch('resume_parser.service.LLMClient')
-    def test_parse_resume_success(self, mock_llm_client, parser_service, mock_db):
+    @patch('server.resume_parser.service.LLMClient')
+    @pytest.mark.asyncio
+    async def test_parse_resume_success(self, mock_llm_client, parser_service, mock_db):
         """Test successful resume parsing."""
         # Mock LLM response
         mock_llm_instance = Mock()
@@ -63,7 +64,8 @@ class TestResumeParserService:
         }
 
 
-        result = parser_service.parse_resume(
+        parser_service.llm_client = mock_llm_instance
+        result = await parser_service.parse_resume(
             resume_id="resume_123",
             candidate_id="candidate_456",
             file_url="http://example.com/resume.pdf",
@@ -76,8 +78,9 @@ class TestResumeParserService:
         assert result.personal_info.full_name.value == "John Doe"
         assert result.personal_info.full_name.confidence == 0.95
 
-    @patch('resume_parser.service.LLMClient')
-    def test_parse_resume_low_confidence(self, mock_llm_client, parser_service, mock_db):
+    @patch('server.resume_parser.service.LLMClient')
+    @pytest.mark.asyncio
+    async def test_parse_resume_low_confidence(self, mock_llm_client, parser_service, mock_db):
         """Test resume parsing with low confidence fields."""
         mock_llm_instance = Mock()
         mock_llm_client.return_value = mock_llm_instance
@@ -108,7 +111,8 @@ class TestResumeParserService:
         }
 
 
-        result = parser_service.parse_resume(
+        parser_service.llm_client = mock_llm_instance
+        result = await parser_service.parse_resume(
             resume_id="resume_123",
             candidate_id="candidate_456",
             file_url="http://example.com/resume.pdf",
@@ -129,14 +133,15 @@ class TestResumeParserService:
 class TestResumeParserRouter:
     """Tests for resume parser router."""
 
-    @patch('resume_parser.router.parser_service')
-    @patch('resume_parser.router.verify_service_token')
+    @patch('server.resume_parser.router.parser_service')
+    @patch('server.resume_parser.router.verify_service_token')
     def test_parse_resume_endpoint(self, mock_auth, mock_service, client):
         """Test POST /parse endpoint."""
         mock_auth.return_value = {"service": "test"}
-        mock_service.parse_resume.return_value = Mock(
-            id="resume_123",
-            candidate_id="candidate_456"
+        mock_service.parse_resume = AsyncMock(
+            return_value=ParsedResumeResponse.model_construct(
+                id="resume_123", candidate_id="candidate_456"
+            )
         )
 
         response = client.post(
@@ -149,23 +154,19 @@ class TestResumeParserRouter:
             headers={"Authorization": "Bearer test_token"}
         )
 
-        # Note: This will fail until router is registered in main.py
-        # For now, this is a placeholder test
+        assert response.status_code == 201
 
-    @patch('resume_parser.router.parser_service')
-    @patch('resume_parser.router.verify_service_token')
+    @patch('server.resume_parser.router.parser_service')
+    @patch('server.resume_parser.router.verify_service_token')
     def test_get_parsed_resume_endpoint(self, mock_auth, mock_service, client):
         """Test GET /{resume_id} endpoint."""
         mock_auth.return_value = {"service": "test"}
-        mock_service.get_parsed_resume.return_value = Mock(
-            id="resume_123",
-            candidate_id="candidate_456"
-        )
+        mock_service.get_parsed_resume.return_value = None
+
 
         response = client.get(
             "/api/v1/resume-parser/resume_123",
             headers={"Authorization": "Bearer test_token"}
         )
 
-        # Note: This will fail until router is registered in main.py
-        # For now, this is a placeholder test
+        assert response.status_code == 404

@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import Mock, patch
 from sqlalchemy.orm import Session
-from answer_evaluation.service import AnswerEvaluationService
-from answer_evaluation.schema import EvaluateAnswerRequest, AnswerEvaluationResponse
+from server.answer_evaluation.service import AnswerEvaluationService
+from server.answer_evaluation.schema import EvaluateAnswerRequest, AnswerEvaluationResponse
 
 
 @pytest.fixture
@@ -38,8 +38,9 @@ def sample_request():
 class TestAnswerEvaluationService:
     """Tests for AnswerEvaluationService."""
     
-    @patch('answer_evaluation.service.LLMClient')
-    def test_evaluate_answer_success(self, mock_llm_client, evaluation_service, sample_request, mock_db):
+    @patch('server.answer_evaluation.service.LLMClient')
+    @pytest.mark.asyncio
+    async def test_evaluate_answer_success(self, mock_llm_client, evaluation_service, sample_request, mock_db):
         """Test successful answer evaluation."""
         # Mock LLM response
         mock_llm_instance = Mock()
@@ -58,7 +59,8 @@ class TestAnswerEvaluationService:
             "token_usage": {"total_tokens": 400}
         }
         
-        result = evaluation_service.evaluate_answer(
+        evaluation_service.llm_client = mock_llm_instance
+        result = await evaluation_service.evaluate_answer(
             request=sample_request,
             db=mock_db
         )

@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import Mock, patch
 from sqlalchemy.orm import Session
-from jd_matching.service import JobMatchingService
-from jd_matching.schema import MatchJobRequest, JobMatchResponse
+from server.jd_matching.service import JobMatchingService
+from server.jd_matching.schema import MatchJobRequest, JobMatchResponse
 
 
 @pytest.fixture
@@ -51,9 +51,10 @@ def mock_parsed_resumes():
 class TestJobMatchingService:
     """Tests for JobMatchingService."""
     
-    @patch('jd_matching.service.EmbeddingService')
-    @patch('jd_matching.service.VectorClient')
-    def test_match_job_success(self, mock_vector_client, mock_embedding_service, matching_service, sample_request, mock_db, mock_parsed_resumes):
+    @patch('server.jd_matching.service.EmbeddingService')
+    @patch('server.jd_matching.service.VectorClient')
+    @pytest.mark.asyncio
+    async def test_match_job_success(self, mock_vector_client, mock_embedding_service, matching_service, sample_request, mock_db, mock_parsed_resumes):
         """Test successful job matching."""
         # Mock embedding service
         mock_es_instance = Mock()
@@ -71,7 +72,9 @@ class TestJobMatchingService:
         # Mock database query
         mock_db.query.return_value.filter.return_value.all.return_value = mock_parsed_resumes
         
-        result = matching_service.match_job(
+        matching_service.embedding_service = mock_es_instance
+        matching_service.vector_client = mock_vc_instance
+        result = await matching_service.match_job(
             request=sample_request,
             db=mock_db
         )

@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import Mock, patch
 from sqlalchemy.orm import Session
-from skill_extraction.service import SkillExtractionService
-from skill_extraction.schema import ExtractSkillsRequest, SkillExtractionResponse
+from server.skill_extraction.service import SkillExtractionService
+from server.skill_extraction.schema import ExtractSkillsRequest, SkillExtractionResponse
 
 
 @pytest.fixture
@@ -31,8 +31,9 @@ def sample_request():
 class TestSkillExtractionService:
     """Tests for SkillExtractionService."""
     
-    @patch('skill_extraction.service.LLMClient')
-    def test_extract_skills_success(self, mock_llm_client, extraction_service, sample_request, mock_db):
+    @patch('server.skill_extraction.service.LLMClient')
+    @pytest.mark.asyncio
+    async def test_extract_skills_success(self, mock_llm_client, extraction_service, sample_request, mock_db):
         """Test successful skill extraction."""
         # Mock LLM response
         mock_llm_instance = Mock()
@@ -66,7 +67,8 @@ class TestSkillExtractionService:
             "token_usage": {"total_tokens": 300}
         }
         
-        result = extraction_service.extract_skills(
+        extraction_service.llm_client = mock_llm_instance
+        result = await extraction_service.extract_skills(
             request=sample_request,
             db=mock_db
         )

@@ -147,19 +147,19 @@ class ScoringEngine:
         # Score based on ratio
         if ratio >= 1.5:
             score = 1.0
-            reasoning = f"Exceeds requirement: {candidate_years} years vs {required_years} required"
+            reasoning = f"Exceeds requirement: {candidate_years:g} years vs {required_years:g} required"
         elif ratio >= 1.0:
             score = 0.9
-            reasoning = f"Meets requirement: {candidate_years} years vs {required_years} required"
+            reasoning = f"Meets requirement: {candidate_years:g} years vs {required_years:g} required"
         elif ratio >= 0.8:
             score = 0.7
-            reasoning = f"Slightly below requirement: {candidate_years} years vs {required_years} required"
+            reasoning = f"Slightly below requirement: {candidate_years:g} years vs {required_years:g} required"
         elif ratio >= 0.5:
             score = 0.5
-            reasoning = f"Below requirement: {candidate_years} years vs {required_years} required"
+            reasoning = f"Below requirement: {candidate_years:g} years vs {required_years:g} required"
         else:
             score = 0.2
-            reasoning = f"Significantly below requirement: {candidate_years} years vs {required_years} required"
+            reasoning = f"Significantly below requirement: {candidate_years:g} years vs {required_years:g} required"
         
         # Bonus for relevant industry experience
         if relevant_experience and len(relevant_experience) > 0:
@@ -212,8 +212,11 @@ class ScoringEngine:
             degree = edu.get("degree", "").lower()
             field = edu.get("field_of_study", "").lower()
             
-            # Check degree match
-            if required_lower in degree or degree in required_lower:
+            # Check degree match, including common degree abbreviations.
+            bachelor_degree = degree in {'bs', 'b.s.', 'ba', 'b.a.', 'bsc', 'b.sc'}
+            if required_lower in degree or degree in required_lower or (
+                'bachelor' in required_lower and bachelor_degree
+            ):
                 score = 1.0
                 reasoning = f"Meets requirement: {edu.get('degree')} in {edu.get('field_of_study')}"
                 break
@@ -326,6 +329,11 @@ class ScoringEngine:
         Raises:
             ValueError: If weights don't sum to 1.0
         """
+        if set(new_weights) != set(self.WEIGHTS):
+            raise ValueError('Weights must include every scoring dimension')
+        if any(weight <= 0 for weight in new_weights.values()):
+            raise ValueError('Weights must be greater than zero')
+
         total = sum(new_weights.values())
         if not (0.99 <= total <= 1.01):  # Allow small floating point error
             raise ValueError(f"Weights must sum to 1.0, got {total}")

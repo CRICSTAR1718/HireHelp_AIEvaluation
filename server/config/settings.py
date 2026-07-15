@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 from typing import Optional
 
@@ -8,6 +9,16 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
     
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def parse_debug(cls, value: object) -> object:
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"development", "debug"}:
+                return True
+            if normalized in {"production", "release"}:
+                return False
+        return value
     # Database
     DATABASE_URL: str  # Transaction pooler connection (PgBouncer port 6543) for running app
     DATABASE_URL_MIGRATIONS: Optional[str] = None  # Direct connection (port 5432) for Alembic DDL

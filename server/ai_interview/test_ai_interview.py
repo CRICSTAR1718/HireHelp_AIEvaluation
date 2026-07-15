@@ -1,10 +1,10 @@
 import pytest
 from unittest.mock import Mock, patch
 from sqlalchemy.orm import Session
-from ai_interview.service import AIInterviewService
-from ai_interview.schema import StartInterviewRequest, SubmitAnswerRequest, InterviewResponse
-from ai_interview.question_generator import QuestionGenerator
-from ai_interview.conversation_manager import ConversationManager
+from server.ai_interview.service import AIInterviewService
+from server.ai_interview.schema import StartInterviewRequest, SubmitAnswerRequest, InterviewResponse
+from server.ai_interview.question_generator import QuestionGenerator
+from server.ai_interview.conversation_manager import ConversationManager
 
 
 @pytest.fixture
@@ -63,7 +63,7 @@ def mock_parsed_resume():
 class TestQuestionGenerator:
     """Tests for QuestionGenerator."""
     
-    @patch('ai_interview.question_generator.LLMClient')
+    @patch('server.ai_interview.question_generator.LLMClient')
     def test_generate_questions(self, mock_llm_client, question_generator):
         """Test question generation."""
         mock_llm_instance = Mock()
@@ -91,6 +91,7 @@ class TestQuestionGenerator:
             "token_usage": {"total_tokens": 500}
         }
         
+        question_generator.llm_client = mock_llm_instance
         questions = question_generator.generate_questions(
             resume_text="Python developer with 5 years experience",
             job_description="Senior Python developer",
@@ -179,8 +180,9 @@ class TestConversationManager:
 class TestAIInterviewService:
     """Tests for AIInterviewService."""
     
-    @patch('ai_interview.service.QuestionGenerator')
-    def test_start_interview_success(self, mock_question_gen, interview_service, sample_start_request, mock_db, mock_parsed_resume):
+    @patch('server.ai_interview.service.QuestionGenerator')
+    @pytest.mark.asyncio
+    async def test_start_interview_success(self, mock_question_gen, interview_service, sample_start_request, mock_db, mock_parsed_resume):
         """Test successful interview start."""
         # Mock database query
         mock_db.query.return_value.filter.return_value.first.return_value = mock_parsed_resume
@@ -198,7 +200,8 @@ class TestAIInterviewService:
             }
         ]
         
-        result = interview_service.start_interview(
+        interview_service.question_generator = mock_qg_instance
+        result = await interview_service.start_interview(
             request=sample_start_request,
             db=mock_db
         )

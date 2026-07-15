@@ -12,7 +12,7 @@ def mock_db():
 @pytest.fixture
 def mock_llm_client():
     """Mock LLM client for all tests."""
-    with patch('llm.client.LLMClient') as mock:
+    with patch('server.llm.client.LLMClient') as mock:
         mock_instance = Mock()
         mock.return_value = mock_instance
         mock_instance.chat_completion.return_value = {

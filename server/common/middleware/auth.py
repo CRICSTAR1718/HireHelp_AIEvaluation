@@ -1,4 +1,4 @@
-from fastapi import Request, HTTPException, status
+from fastapi import Request, HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional
 from ..exceptions import AIServiceException
@@ -9,13 +9,13 @@ security = HTTPBearer()
 
 async def verify_service_token(
     request: Request,
-    credentials: HTTPAuthorizationCredentials = security
+    credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> dict:
     """
     Verify JWT token for service-to-service communication.
     Extracts and validates claims from the token.
     """
-    from ..config.settings import settings
+    from ...config.settings import settings
     
     token = credentials.credentials
     

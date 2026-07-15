@@ -1,9 +1,9 @@
 import pytest
 from unittest.mock import Mock, patch
 from sqlalchemy.orm import Session
-from fitment_score.service import FitmentScoreService
-from fitment_score.schema import CalculateFitmentRequest, FitmentScoreResponse
-from fitment_score.scoring_engine import ScoringEngine, DimensionScore
+from server.fitment_score.service import FitmentScoreService
+from server.fitment_score.schema import CalculateFitmentRequest, FitmentScoreResponse
+from server.fitment_score.scoring_engine import ScoringEngine, DimensionScore
 
 
 @pytest.fixture
@@ -146,8 +146,9 @@ class TestFitmentScoreService:
             assert isinstance(dimension, DimensionScore)
             assert 0.0 <= dimension.score <= 1.0
 
-    @patch('fitment_score.service.LLMClient')
-    def test_calculate_fitment_success(self, mock_llm_client, fitment_service, sample_request, mock_db):
+    @patch('server.fitment_score.service.LLMClient')
+    @pytest.mark.asyncio
+    async def test_calculate_fitment_success(self, mock_llm_client, fitment_service, sample_request, mock_db):
         """Test successful fitment calculation."""
         # Mock LLM response
         mock_llm_instance = Mock()
@@ -166,7 +167,8 @@ class TestFitmentScoreService:
         }
 
 
-        result = fitment_service.calculate_fitment(
+        fitment_service.llm_client = mock_llm_instance
+        result = await fitment_service.calculate_fitment(
             request=sample_request,
             db=mock_db
         )

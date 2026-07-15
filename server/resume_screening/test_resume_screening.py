@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import Mock, patch
 from sqlalchemy.orm import Session
-from resume_screening.service import ResumeScreeningService
-from resume_screening.schema import ScreenedResumeResponse, CriteriaMatch
+from server.resume_screening.service import ResumeScreeningService
+from server.resume_screening.schema import ScreenedResumeResponse, CriteriaMatch
 
 
 @pytest.fixture
@@ -49,8 +49,9 @@ def mock_parsed_resume():
 class TestResumeScreeningService:
     """Tests for ResumeScreeningService."""
 
-    @patch('resume_screening.service.LLMClient')
-    def test_screen_resume_success(self, mock_llm_client, screening_service, mock_db, mock_parsed_resume):
+    @patch('server.resume_screening.service.LLMClient')
+    @pytest.mark.asyncio
+    async def test_screen_resume_success(self, mock_llm_client, screening_service, mock_db, mock_parsed_resume):
         """Test successful resume screening."""
         # Mock database query
         mock_db.query.return_value.filter.return_value.first.return_value = mock_parsed_resume
@@ -85,7 +86,8 @@ class TestResumeScreeningService:
         }
 
 
-        result = screening_service.screen_resume(
+        screening_service.llm_client = mock_llm_instance
+        result = await screening_service.screen_resume(
             resume_id="resume_123",
             job_id="job_456",
             job_description="Software Engineer position",
