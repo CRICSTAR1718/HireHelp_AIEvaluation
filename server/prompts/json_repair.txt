@@ -1,0 +1,11 @@
+The content below was intended to be a JSON object but may have syntax errors.
+Return the same data as one strictly valid JSON object.
+
+Rules:
+- Fix JSON syntax only; do not invent, omit, or summarize data.
+- Use double quotes for all JSON keys and string values.
+- Escape quotes and control characters inside string values.
+- Return only the JSON object. Do not use Markdown or code fences.
+
+Content to repair:
+{{ malformed_response }}

@@ -323,6 +323,8 @@ class FitmentScoreService:
         job_id: str,
         candidate_id: str,
         resume_id: str,
+        required_skills: Optional[list[str]] = None,
+        required_experience_years: Optional[float] = None,
         db: Optional[Session] = None
     ) -> FitmentScoreResponse:
         """
@@ -379,9 +381,9 @@ class FitmentScoreService:
             resume_id=resume_id,
             job_description=job_description,
             candidate_skills=candidate_skills,
-            required_skills=[],  # Will be extracted from job_description by LLM
+            required_skills=required_skills or [],
             candidate_experience_years=candidate_experience_years,
-            required_experience_years=0,  # Will be extracted from job_description by LLM
+            required_experience_years=required_experience_years or 0,
             candidate_education=candidate_education,
             relevant_experience=relevant_experience
         )

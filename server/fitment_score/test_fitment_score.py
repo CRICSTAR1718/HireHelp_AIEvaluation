@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 from sqlalchemy.orm import Session
 from server.fitment_score.service import FitmentScoreService
 from server.fitment_score.schema import CalculateFitmentRequest, FitmentScoreResponse
@@ -179,6 +179,30 @@ class TestFitmentScoreService:
         assert 0.0 <= result.overall_score <= 1.0
         assert result.overall_reasoning  # Must have reasoning per PRD
 
+    @pytest.mark.asyncio
+    async def test_calculate_from_parsed_resume_forwards_job_requirements(self, fitment_service, mock_db):
+        """Job requirements from evaluation are used by deterministic fitment scoring."""
+        parsed_resume = Mock()
+        parsed_resume.skills.skills = []
+        parsed_resume.experience.total_years.value = 4.0
+        parsed_resume.education = []
+        parsed_resume.experience.work_history = []
+        fitment_service.calculate_fitment = AsyncMock(return_value=Mock())
+
+        await fitment_service.calculate_fitment_from_parsed_resume(
+            parsed_resume=parsed_resume,
+            job_description="Backend Engineer",
+            job_id="job_456",
+            candidate_id="candidate_123",
+            resume_id="resume_789",
+            required_skills=["Python", "SQL"],
+            required_experience_years=3.0,
+            db=mock_db,
+        )
+
+        internal_request = fitment_service.calculate_fitment.call_args.args[0]
+        assert internal_request.required_skills == ["Python", "SQL"]
+        assert internal_request.required_experience_years == 3.0
     def test_get_fitment_score_not_found(self, fitment_service, mock_db):
         """Test retrieving non-existent fitment score."""
         mock_db.query.return_value.filter.return_value.first.return_value = None

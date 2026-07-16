@@ -152,6 +152,20 @@ class TestResumeParserService:
         # Should flag for human review due to low confidence
         assert result.needs_human_review == True
 
+    def test_parse_llm_response_repairs_malformed_json(self, parser_service):
+        """A malformed model response is repaired once before the parse fails."""
+        parser_service.llm_client = Mock()
+        parser_service.llm_client.chat_completion.return_value = {
+            "content": '{"personal_info": {"full_name": {"value": "Jane Doe", "confidence": 0.95}}}'
+        }
+
+        parsed = parser_service._parse_llm_response(
+            '{"personal_info": {"full_name": {"value": "Jane Doe" "confidence": 0.95}}}'
+        )
+
+        assert parsed["personal_info"]["full_name"]["value"] == "Jane Doe"
+        parser_service.llm_client.chat_completion.assert_called_once()
+        assert parser_service.llm_client.chat_completion.call_args.kwargs["temperature"] == 0
     def test_get_parsed_resume_not_found(self, parser_service, mock_db):
         """Test retrieving non-existent parsed resume."""
         mock_db.query.return_value.filter.return_value.first.return_value = None

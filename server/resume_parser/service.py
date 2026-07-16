@@ -26,14 +26,14 @@ class ResumeParserService:
         self.llm_client = LLMClient()
         self.confidence_threshold = settings.CONFIDENCE_THRESHOLD
     
-    def _load_prompt_template(self) -> str:
-        """Load the resume parsing prompt template."""
+    def _load_prompt_template(self, prompt_name: str = "resume_parsing.txt") -> str:
+        """Load a prompt template from the prompts directory."""
         try:
-            with open("server/prompts/resume_parsing.txt", "r") as f:
+            with open(f"server/prompts/{prompt_name}", "r") as f:
                 return f.read()
         except Exception as e:
-            logger.error(f"Failed to load prompt template: {str(e)}")
-            raise LLMProviderError(f"Failed to load prompt template: {str(e)}")
+            logger.error(f"Failed to load prompt template {prompt_name}: {str(e)}")
+            raise LLMProviderError(f"Failed to load prompt template {prompt_name}: {str(e)}")
     
     def _extract_text_from_file(self, file_url: str, file_type: str) -> str:
         """
@@ -97,20 +97,39 @@ class ResumeParserService:
         except Exception as e:
             raise LLMProviderError(f"Failed to extract text from PDF: {str(e)}")
     
+    @staticmethod
+    def _extract_json(response_text: str) -> Dict[str, Any]:
+        """Extract and parse a JSON object from an LLM response."""
+        start_idx = response_text.find("{")
+        end_idx = response_text.rfind("}") + 1
+        if start_idx == -1 or end_idx == 0:
+            raise ValueError("No JSON object found in response")
+        return json.loads(response_text[start_idx:end_idx])
+
     def _parse_llm_response(self, response_text: str) -> Dict[str, Any]:
-        """Parse the LLM JSON response."""
+        """Parse the LLM response, retrying once with a JSON-only repair prompt."""
         try:
-            # Extract JSON from response (in case of extra text)
-            start_idx = response_text.find("{")
-            end_idx = response_text.rfind("}") + 1
-            if start_idx == -1 or end_idx == 0:
-                raise ValueError("No JSON found in response")
-            
-            json_str = response_text[start_idx:end_idx]
-            return json.loads(json_str)
-        except Exception as e:
-            logger.error(f"Failed to parse LLM response: {str(e)}")
-            raise LLMProviderError(f"Failed to parse LLM response: {str(e)}")
+            return self._extract_json(response_text)
+        except (json.JSONDecodeError, ValueError) as initial_error:
+            logger.warning("Malformed JSON from resume parser LLM: %s", initial_error)
+
+            try:
+                repair_template = Template(self._load_prompt_template("json_repair.txt"))
+                repair_prompt = repair_template.render(malformed_response=response_text)
+                repair_response = self.llm_client.chat_completion(
+                    messages=[{"role": "user", "content": repair_prompt}],
+                    temperature=0,
+                )
+                return self._extract_json(repair_response["content"])
+            except Exception as repair_error:
+                logger.error(
+                    "Failed to parse LLM response after JSON repair: initial=%s repair=%s",
+                    initial_error,
+                    repair_error,
+                )
+                raise LLMProviderError(
+                    f"Failed to parse LLM response: {initial_error}; JSON repair failed: {repair_error}"
+                ) from repair_error
     
     def _check_confidence_thresholds(self, parsed_data: Dict[str, Any]) -> bool:
         """
