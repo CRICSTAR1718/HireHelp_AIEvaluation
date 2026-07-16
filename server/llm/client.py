@@ -173,12 +173,20 @@ class LLMClient:
         )
         
         # Gemini doesn't provide token usage in the same way
+        # Gemini exposes token counts via response.usage_metadata
+        usage = getattr(response, "usage_metadata", None)
+        prompt_tokens = getattr(usage, "prompt_token_count", 0) if usage else 0
+        completion_tokens = getattr(usage, "candidates_token_count", 0) if usage else 0
+        total_tokens = getattr(usage, "total_token_count", None) if usage else None
+        if total_tokens is None:
+            total_tokens = (prompt_tokens or 0) + (completion_tokens or 0)
+
         return {
             "content": response.text,
             "token_usage": {
-                "prompt_tokens": None,
-                "completion_tokens": None,
-                "total_tokens": None
+                "prompt_tokens": prompt_tokens or 0,
+                "completion_tokens": completion_tokens or 0,
+                "total_tokens": total_tokens or 0
             }
         }
     

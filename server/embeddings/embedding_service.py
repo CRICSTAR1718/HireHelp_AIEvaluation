@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 class EmbeddingService:
     """
     Service for generating embeddings from text.
-    Supports multiple embedding providers (OpenAI, Qdrant, pgvector).
+    Supports multiple embedding providers (OpenAI, Gemini, Qdrant, pgvector).
     """
     
     def __init__(self):
@@ -22,6 +22,8 @@ class EmbeddingService:
         """Initialize the appropriate embedding provider."""
         if self.provider == "openai":
             self._init_openai()
+        elif self.provider == "gemini":
+            self._init_gemini()
         elif self.provider == "qdrant":
             self._init_qdrant()
         elif self.provider == "pgvector":
@@ -40,6 +42,18 @@ class EmbeddingService:
         except Exception as e:
             raise EmbeddingError(f"Failed to initialize OpenAI embedding service: {str(e)}")
     
+    def _init_gemini(self):
+        """Initialize Gemini embedding client."""
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=settings.GEMINI_API_KEY)
+            self._genai = genai
+            logger.info(f"Initialized Gemini embedding service with model: {self.model}")
+        except ImportError:
+            raise EmbeddingError("google-generativeai package not installed")
+        except Exception as e:
+            raise EmbeddingError(f"Failed to initialize Gemini embedding service: {str(e)}")
+
     def _init_qdrant(self):
         """Initialize Qdrant client for embeddings."""
         try:
@@ -55,15 +69,15 @@ class EmbeddingService:
             raise EmbeddingError(f"Failed to initialize Qdrant embedding service: {str(e)}")
     
     def _init_pgvector(self):
-        """Initialize pgvector for embeddings."""
-        try:
-            import psycopg2
-            self.connection = psycopg2.connect(settings.PGVECTOR_CONNECTION_STRING)
-            logger.info("Initialized pgvector embedding service")
-        except ImportError:
-            raise EmbeddingError("psycopg2 package not installed")
-        except Exception as e:
-            raise EmbeddingError(f"Failed to initialize pgvector embedding service: {str(e)}")
+        """
+        pgvector is a storage backend (see VectorClient), not an embedding
+        generator. EMBEDDING_PROVIDER should be 'openai' or 'gemini'; VECTOR_BACKEND
+        should be 'pgvector'. These are independent settings.
+        """
+        raise EmbeddingError(
+            "EMBEDDING_PROVIDER=pgvector is invalid — pgvector only stores vectors. "
+            "Set EMBEDDING_PROVIDER=openai or gemini, and VECTOR_BACKEND=pgvector instead."
+        )
     
     def generate_embedding(self, text: str) -> List[float]:
         """
@@ -78,6 +92,8 @@ class EmbeddingService:
         try:
             if self.provider == "openai":
                 return self._openai_embedding(text)
+            elif self.provider == "gemini":
+                return self._gemini_embedding(text)
             elif self.provider == "qdrant":
                 return self._qdrant_embedding(text)
             elif self.provider == "pgvector":
@@ -101,6 +117,8 @@ class EmbeddingService:
         try:
             if self.provider == "openai":
                 return self._openai_embeddings_batch(texts)
+            elif self.provider == "gemini":
+                return [self._gemini_embedding(t) for t in texts]
             else:
                 # Fallback to individual calls for other providers
                 return [self.generate_embedding(text) for text in texts]
@@ -124,6 +142,28 @@ class EmbeddingService:
         )
         return [item.embedding for item in response.data]
     
+    def _gemini_embedding(self, text: str) -> List[float]:
+        """Generate embedding using Gemini's embedding API."""
+        model_name = self.model if self.model.startswith("models/") else f"models/{self.model}"
+        try:
+            result = self._genai.embed_content(
+                model=model_name,
+                content=text,
+                output_dimensionality=self.dimension,
+            )
+        except TypeError:
+            # Installed google-generativeai version doesn't support
+            # output_dimensionality — fall back to the model's default size.
+            logger.warning(
+                "Installed google-generativeai version doesn't support "
+                "output_dimensionality; using model's default embedding size instead."
+            )
+            result = self._genai.embed_content(
+                model=model_name,
+                content=text,
+            )
+        return result["embedding"]
+
     def _qdrant_embedding(self, text: str) -> List[float]:
         """Generate embedding using Qdrant's built-in encoder."""
         # Qdrant doesn't have built-in embedding generation

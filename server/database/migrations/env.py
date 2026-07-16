@@ -5,17 +5,14 @@ from alembic import context
 import sys
 import os
 
-# Add parent directory to path to import config
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+# Add repo root (parent of `server/`) to path so `server.*` absolute imports resolve
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
 
-from config.settings import settings
-from sqlalchemy.ext.declarative import declarative_base
+from server.config.settings import settings
+from server.config.db import Base
 
-# Import models for autogenerate - but don't import config.db to avoid engine creation
-from database.models import *  # Import all models
-
-# Create Base declarative class for metadata
-Base = declarative_base()
+# Import models so they register on Base's metadata for autogenerate
+from server.database import models  # noqa: F401
 
 # this is the Alembic Config object
 config = context.config
