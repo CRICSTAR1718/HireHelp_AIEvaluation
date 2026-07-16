@@ -4,6 +4,8 @@ import logging
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 from jinja2 import Template
+import httpx
+import pdfplumber
 from ..llm.client import LLMClient
 from ..config.settings import settings
 from ..common.exceptions import LLMProviderError, ConfidenceThresholdError
@@ -36,13 +38,64 @@ class ResumeParserService:
     def _extract_text_from_file(self, file_url: str, file_type: str) -> str:
         """
         Extract text from resume file.
-        In production, this would use a PDF/text extraction library.
-        For now, this is a placeholder.
+        
+        Downloads the file from the given URL and extracts text based on file type.
+        Currently supports PDF via pdfplumber.
+        
+        Args:
+            file_url: Public URL to the resume file (e.g., Supabase storage)
+            file_type: File type (currently only 'pdf' supported)
+        
+        Returns:
+            Extracted text content
+        
+        Raises:
+            LLMProviderError: If download fails, file is corrupt, or unsupported type
         """
-        # TODO: Implement actual file extraction using PyPDF2, pdfplumber, or similar
-        # This would download the file from file_url and extract text
-        logger.warning(f"File extraction not implemented for {file_url}")
-        return "Sample resume text for parsing"
+        if file_type.lower() != "pdf":
+            raise LLMProviderError(f"Unsupported file type: {file_type}. Only PDF is currently supported.")
+        
+        try:
+            # Download the file from the public URL
+            logger.info(f"Downloading resume from {file_url}")
+            response = httpx.get(file_url, timeout=30.0)
+            response.raise_for_status()
+            
+            # Save to temporary file for pdfplumber
+            import tempfile
+            import os
+            
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+                temp_file.write(response.content)
+                temp_path = temp_file.name
+            
+            try:
+                # Extract text using pdfplumber
+                text_parts = []
+                with pdfplumber.open(temp_path) as pdf:
+                    for page in pdf.pages:
+                        page_text = page.extract_text()
+                        if page_text:
+                            text_parts.append(page_text)
+                
+                extracted_text = "\n".join(text_parts)
+                
+                if not extracted_text or len(extracted_text.strip()) < 50:
+                    raise LLMProviderError(
+                        f"Extracted text is too short or empty. The file may be corrupt or image-based PDF."
+                    )
+                
+                logger.info(f"Successfully extracted {len(extracted_text)} characters from PDF")
+                return extracted_text
+                
+            finally:
+                # Clean up temporary file
+                os.unlink(temp_path)
+                
+        except httpx.HTTPStatusError as e:
+            raise LLMProviderError(f"Failed to download resume from {file_url}: {str(e)}")
+        except Exception as e:
+            raise LLMProviderError(f"Failed to extract text from PDF: {str(e)}")
     
     def _parse_llm_response(self, response_text: str) -> Dict[str, Any]:
         """Parse the LLM JSON response."""

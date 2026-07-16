@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 
 class EvaluationRequest(BaseModel):
@@ -8,6 +8,8 @@ class EvaluationRequest(BaseModel):
     job_id: str
     resume_url: str
     job_description: str
+    required_skills: Optional[List[str]] = None
+    required_experience_years: Optional[float] = None
 
 
 class EvaluationResponse(BaseModel):

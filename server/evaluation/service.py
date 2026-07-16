@@ -41,6 +41,8 @@ class EvaluationService:
             job_id=request.job_id,
             candidate_id=request.candidate_id,
             resume_id=resume_id,
+            required_skills=request.required_skills or [],
+            required_experience_years=request.required_experience_years or 0,
             db=db,
         )
 

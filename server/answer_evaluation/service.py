@@ -95,27 +95,32 @@ Respond in JSON format:
             token_usage=evaluation_metadata.get("token_usage")
         )
     
-    def _save_to_database(self, db: Session, evaluation_response: AnswerEvaluationResponse) -> AnswerEvaluation:
-        """Save answer evaluation to database."""
-        db_evaluation = AnswerEvaluation(
-            id=evaluation_response.id,
-            interview_id=evaluation_response.interview_id,
-            question_index=evaluation_response.question_index,
-            score=evaluation_response.score,
-            reasoning=evaluation_response.reasoning,
-            strengths=evaluation_response.strengths,
-            weaknesses=evaluation_response.weaknesses,
-            follow_up_suggestions=evaluation_response.follow_up_suggestions,
-            evaluation_model=evaluation_response.evaluation_model,
-            evaluation_duration_ms=evaluation_response.evaluation_duration_ms,
-            token_usage=evaluation_response.token_usage
-        )
-        
-        db.add(db_evaluation)
-        db.commit()
-        db.refresh(db_evaluation)
-        
-        return db_evaluation
+    def _save_to_database(self, db: Session, evaluation_response: AnswerEvaluationResponse) -> Optional[AnswerEvaluation]:
+        """Save answer evaluation to database. Returns None if save fails (e.g., foreign key violation)."""
+        try:
+            db_evaluation = AnswerEvaluation(
+                id=evaluation_response.id,
+                interview_id=evaluation_response.interview_id,
+                question_index=evaluation_response.question_index,
+                score=evaluation_response.score,
+                reasoning=evaluation_response.reasoning,
+                strengths=evaluation_response.strengths,
+                weaknesses=evaluation_response.weaknesses,
+                follow_up_suggestions=evaluation_response.follow_up_suggestions,
+                evaluation_model=evaluation_response.evaluation_model,
+                evaluation_duration_ms=evaluation_response.evaluation_duration_ms,
+                token_usage=evaluation_response.token_usage
+            )
+            
+            db.add(db_evaluation)
+            db.commit()
+            db.refresh(db_evaluation)
+            
+            return db_evaluation
+        except Exception as e:
+            logger.warning(f"Failed to save answer evaluation to database (interview_id may not exist): {str(e)}")
+            db.rollback()
+            return None
     
     async def evaluate_answer(
         self,

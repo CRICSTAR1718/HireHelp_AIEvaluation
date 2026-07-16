@@ -73,10 +73,13 @@ class FitmentScoreService:
         self,
         request: CalculateFitmentRequest,
         dimension_scores: Dict[str, DimensionScore]
-    ) -> Dict[str, Any]:
+    ) -> tuple[Dict[str, Any], Dict[str, Any]]:
         """
         Use LLM to enhance scoring with detailed reasoning and recommendations.
         This adds the qualitative analysis that pure scoring can't provide.
+        
+        Returns:
+            Tuple of (parsed_response, token_usage_dict)
         """
         template_str = self._load_prompt_template()
         template = Template(template_str)
@@ -97,7 +100,7 @@ class FitmentScoreService:
             messages=[{"role": "user", "content": prompt}]
         )
         
-        return self._parse_llm_response(llm_response["content"])
+        return self._parse_llm_response(llm_response["content"]), llm_response["token_usage"]
     
     def _parse_llm_response(self, response_text: str) -> Dict[str, Any]:
         """Parse the LLM JSON response."""
@@ -161,30 +164,56 @@ class FitmentScoreService:
         )
     
     def _save_to_database(self, db: Session, fitment_response: FitmentScoreResponse) -> FitmentScore:
-        """Save fitment score to database."""
-        db_score = FitmentScore(
-            id=fitment_response.id,
-            candidate_id=fitment_response.candidate_id,
-            job_id=fitment_response.job_id,
-            resume_id=fitment_response.resume_id,
-            overall_score=fitment_response.overall_score,
-            overall_reasoning=fitment_response.overall_reasoning,
-            skills_score=fitment_response.skills_score,
-            skills_reasoning=fitment_response.skills_reasoning,
-            experience_score=fitment_response.experience_score,
-            experience_reasoning=fitment_response.experience_reasoning,
-            education_score=fitment_response.education_score,
-            education_reasoning=fitment_response.education_reasoning,
-            culture_fit_score=fitment_response.culture_fit_score,
-            culture_fit_reasoning=fitment_response.culture_fit_reasoning,
-            scoring_model=fitment_response.scoring_model,
-            scoring_duration_ms=fitment_response.scoring_duration_ms,
-            token_usage=fitment_response.token_usage
-        )
+        """Save fitment score to database with upsert logic."""
+        # Check for existing row
+        db_score = db.query(FitmentScore).filter(
+            FitmentScore.id == fitment_response.id
+        ).first()
         
-        db.add(db_score)
-        db.commit()
-        db.refresh(db_score)
+        if db_score:
+            # Update existing row
+            db_score.candidate_id = fitment_response.candidate_id
+            db_score.job_id = fitment_response.job_id
+            db_score.resume_id = fitment_response.resume_id
+            db_score.overall_score = fitment_response.overall_score
+            db_score.overall_reasoning = fitment_response.overall_reasoning
+            db_score.skills_score = fitment_response.skills_score
+            db_score.skills_reasoning = fitment_response.skills_reasoning
+            db_score.experience_score = fitment_response.experience_score
+            db_score.experience_reasoning = fitment_response.experience_reasoning
+            db_score.education_score = fitment_response.education_score
+            db_score.education_reasoning = fitment_response.education_reasoning
+            db_score.culture_fit_score = fitment_response.culture_fit_score
+            db_score.culture_fit_reasoning = fitment_response.culture_fit_reasoning
+            db_score.scoring_model = fitment_response.scoring_model
+            db_score.scoring_duration_ms = fitment_response.scoring_duration_ms
+            db_score.token_usage = fitment_response.token_usage
+            db.commit()
+            db.refresh(db_score)
+        else:
+            # Insert new row
+            db_score = FitmentScore(
+                id=fitment_response.id,
+                candidate_id=fitment_response.candidate_id,
+                job_id=fitment_response.job_id,
+                resume_id=fitment_response.resume_id,
+                overall_score=fitment_response.overall_score,
+                overall_reasoning=fitment_response.overall_reasoning,
+                skills_score=fitment_response.skills_score,
+                skills_reasoning=fitment_response.skills_reasoning,
+                experience_score=fitment_response.experience_score,
+                experience_reasoning=fitment_response.experience_reasoning,
+                education_score=fitment_response.education_score,
+                education_reasoning=fitment_response.education_reasoning,
+                culture_fit_score=fitment_response.culture_fit_score,
+                culture_fit_reasoning=fitment_response.culture_fit_reasoning,
+                scoring_model=fitment_response.scoring_model,
+                scoring_duration_ms=fitment_response.scoring_duration_ms,
+                token_usage=fitment_response.token_usage
+            )
+            db.add(db_score)
+            db.commit()
+            db.refresh(db_score)
         
         return db_score
     
@@ -211,14 +240,14 @@ class FitmentScoreService:
             dimension_scores = self._calculate_dimension_scores(request)
             
             # Enhance with LLM reasoning
-            llm_enhancement = self._enhance_with_llm(request, dimension_scores)
+            llm_enhancement, token_usage = self._enhance_with_llm(request, dimension_scores)
             
             # Build response
             scoring_metadata = {
                 "model": settings.LLM_MODEL,
                 "timestamp": time.time(),
                 "duration_ms": 0,  # Will be set at end
-                "token_usage": 0
+                "token_usage": token_usage.get("total_tokens", 0)
             }
             
             fitment_response = self._convert_to_schema(

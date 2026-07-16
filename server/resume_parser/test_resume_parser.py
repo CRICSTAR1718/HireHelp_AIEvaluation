@@ -30,10 +30,25 @@ def client():
 class TestResumeParserService:
     """Tests for ResumeParserService."""
 
+    @patch('server.resume_parser.service.pdfplumber')
+    @patch('server.resume_parser.service.httpx')
     @patch('server.resume_parser.service.LLMClient')
     @pytest.mark.asyncio
-    async def test_parse_resume_success(self, mock_llm_client, parser_service, mock_db):
+    async def test_parse_resume_success(self, mock_llm_client, mock_httpx, mock_pdfplumber, parser_service, mock_db):
         """Test successful resume parsing."""
+        # Mock HTTP download response
+        mock_response = Mock()
+        mock_response.content = b"fake pdf content"
+        mock_response.raise_for_status = Mock()
+        mock_httpx.get.return_value = mock_response
+        
+        # Mock pdfplumber.open
+        mock_pdf = Mock()
+        mock_page = Mock()
+        mock_page.extract_text.return_value = "Sample resume text for John Doe with Python experience"
+        mock_pdf.pages = [mock_page]
+        mock_pdfplumber.open.return_value.__enter__.return_value = mock_pdf
+        
         # Mock LLM response
         mock_llm_instance = Mock()
         mock_llm_client.return_value = mock_llm_instance
@@ -78,10 +93,25 @@ class TestResumeParserService:
         assert result.personal_info.full_name.value == "John Doe"
         assert result.personal_info.full_name.confidence == 0.95
 
+    @patch('server.resume_parser.service.pdfplumber')
+    @patch('server.resume_parser.service.httpx')
     @patch('server.resume_parser.service.LLMClient')
     @pytest.mark.asyncio
-    async def test_parse_resume_low_confidence(self, mock_llm_client, parser_service, mock_db):
+    async def test_parse_resume_low_confidence(self, mock_llm_client, mock_httpx, mock_pdfplumber, parser_service, mock_db):
         """Test resume parsing with low confidence fields."""
+        # Mock HTTP download response
+        mock_response = Mock()
+        mock_response.content = b"fake pdf content"
+        mock_response.raise_for_status = Mock()
+        mock_httpx.get.return_value = mock_response
+        
+        # Mock pdfplumber.open
+        mock_pdf = Mock()
+        mock_page = Mock()
+        mock_page.extract_text.return_value = "Sample resume text for John Doe with Python experience"
+        mock_pdf.pages = [mock_page]
+        mock_pdfplumber.open.return_value.__enter__.return_value = mock_pdf
+        
         mock_llm_instance = Mock()
         mock_llm_client.return_value = mock_llm_instance
         mock_llm_instance.chat_completion.return_value = {
@@ -137,7 +167,7 @@ class TestResumeParserRouter:
     @patch('server.resume_parser.router.verify_service_token')
     def test_parse_resume_endpoint(self, mock_auth, mock_service, client):
         """Test POST /parse endpoint."""
-        mock_auth.return_value = {"service": "test"}
+        mock_auth.return_value = {"service": "recruitment-service"}
         mock_service.parse_resume = AsyncMock(
             return_value=ParsedResumeResponse.model_construct(
                 id="resume_123", candidate_id="candidate_456"
@@ -151,7 +181,7 @@ class TestResumeParserRouter:
                 "candidate_id": "candidate_456",
                 "file_url": "http://example.com/resume.pdf"
             },
-            headers={"Authorization": "Bearer test_token"}
+            headers={"x-internal-service": "recruitment-service"}
         )
 
         assert response.status_code == 201
@@ -160,13 +190,13 @@ class TestResumeParserRouter:
     @patch('server.resume_parser.router.verify_service_token')
     def test_get_parsed_resume_endpoint(self, mock_auth, mock_service, client):
         """Test GET /{resume_id} endpoint."""
-        mock_auth.return_value = {"service": "test"}
+        mock_auth.return_value = {"service": "recruitment-service"}
         mock_service.get_parsed_resume.return_value = None
 
 
         response = client.get(
             "/api/v1/resume-parser/resume_123",
-            headers={"Authorization": "Bearer test_token"}
+            headers={"x-internal-service": "recruitment-service"}
         )
 
         assert response.status_code == 404

@@ -156,23 +156,42 @@ Respond in JSON format:
         )
     
     def _save_to_database(self, db: Session, screened_response: ScreenedResumeResponse) -> ScreenedResume:
-        """Save screening result to database."""
-        db_screening = ScreenedResume(
-            id=screened_response.id,
-            resume_id=screened_response.resume_id,
-            job_id=screened_response.job_id,
-            meets_requirements=1 if screened_response.meets_requirements else 0,
-            screening_reasoning=screened_response.screening_reasoning,
-            screening_score=screened_response.screening_score,
-            criteria_match=[criterion.dict() for criterion in screened_response.criteria_match],
-            screening_model=screened_response.screening_model,
-            screening_duration_ms=screened_response.screening_duration_ms,
-            token_usage=screened_response.token_usage
-        )
+        """Save screening result to database with upsert logic."""
+        # Check for existing row
+        db_screening = db.query(ScreenedResume).filter(
+            ScreenedResume.id == screened_response.id
+        ).first()
         
-        db.add(db_screening)
-        db.commit()
-        db.refresh(db_screening)
+        if db_screening:
+            # Update existing row
+            db_screening.resume_id = screened_response.resume_id
+            db_screening.job_id = screened_response.job_id
+            db_screening.meets_requirements = 1 if screened_response.meets_requirements else 0
+            db_screening.screening_reasoning = screened_response.screening_reasoning
+            db_screening.screening_score = screened_response.screening_score
+            db_screening.criteria_match = [criterion.dict() for criterion in screened_response.criteria_match]
+            db_screening.screening_model = screened_response.screening_model
+            db_screening.screening_duration_ms = screened_response.screening_duration_ms
+            db_screening.token_usage = screened_response.token_usage
+            db.commit()
+            db.refresh(db_screening)
+        else:
+            # Insert new row
+            db_screening = ScreenedResume(
+                id=screened_response.id,
+                resume_id=screened_response.resume_id,
+                job_id=screened_response.job_id,
+                meets_requirements=1 if screened_response.meets_requirements else 0,
+                screening_reasoning=screened_response.screening_reasoning,
+                screening_score=screened_response.screening_score,
+                criteria_match=[criterion.dict() for criterion in screened_response.criteria_match],
+                screening_model=screened_response.screening_model,
+                screening_duration_ms=screened_response.screening_duration_ms,
+                token_usage=screened_response.token_usage
+            )
+            db.add(db_screening)
+            db.commit()
+            db.refresh(db_screening)
         
         return db_screening
     

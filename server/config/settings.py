@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: Optional[str] = None
     JWT_ALGORITHM: str = "HS256"
     SERVICE_TOKEN: Optional[str] = None
+    ALLOWED_INTERNAL_SERVICES: list[str] = ["recruitment-service", "candidate-service"]
     
     # Internal Service URLs
     RECRUITMENT_SERVICE_URL: str = "http://localhost:8001"
