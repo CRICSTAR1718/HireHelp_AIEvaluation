@@ -1,52 +1,58 @@
 import logging
 from sqlalchemy.orm import Session
-from ..resume_parser.service import ResumeParserService
-from ..fitment_score.service import FitmentScoreService
-from ..resume_parser.schema import ParsedResumeResponse
+from ..common.exceptions import LLMProviderError
 from .schema import EvaluationRequest, EvaluationResponse
+from .workflow import EvaluationWorkflow
 
 logger = logging.getLogger(__name__)
 
 
 class EvaluationService:
-    """Orchestrates the complete resume evaluation pipeline."""
+    """Orchestrates the complete resume evaluation pipeline using LangGraph."""
 
     def __init__(self):
-        # Instantiate services only once
-        self.resume_parser_service = ResumeParserService()
-        self.fitment_score_service = FitmentScoreService()
+        # Initialize LangGraph workflow
+        self.workflow = EvaluationWorkflow()
 
     async def evaluate(self, request: EvaluationRequest, db: Session) -> EvaluationResponse:
         """
-        Complete evaluation pipeline.
+        Complete evaluation pipeline using LangGraph workflow.
 
+        The workflow orchestrates:
         1. Parse Resume
         2. Calculate Fitment Score
         3. Return Evaluation Response
         """
-        # Step 1: Parse Resume
-        resume_id = f"resume_{request.candidate_id}_{request.application_id}"
-        parsed_resume: ParsedResumeResponse = await self.resume_parser_service.parse_resume(
-            resume_id=resume_id,
-            candidate_id=request.candidate_id,
-            file_url=request.resume_url,
-            file_type="pdf",
-            db=db,
-        )
+        # Prepare initial state for the workflow
+        initial_state = {
+            "application_id": request.application_id,
+            "candidate_id": request.candidate_id,
+            "job_id": request.job_id,
+            "resume_url": request.resume_url,
+            "job_description": request.job_description,
+            "required_skills": request.required_skills,
+            "required_experience_years": request.required_experience_years,
+            "db": db,
+            "resume_id": None,
+            "parsed_resume": None,
+            "fitment_result": None,
+            "error": None
+        }
 
-        # Step 2: Calculate Fitment Score
-        fitment_result = await self.fitment_score_service.calculate_fitment_from_parsed_resume(
-            parsed_resume=parsed_resume,
-            job_description=request.job_description,
-            job_id=request.job_id,
-            candidate_id=request.candidate_id,
-            resume_id=resume_id,
-            required_skills=request.required_skills or [],
-            required_experience_years=request.required_experience_years or 0,
-            db=db,
-        )
+        # Run the LangGraph workflow
+        final_state = await self.workflow.run(initial_state)
 
-        # Step 3: Build Evaluation Response
+        # Check for errors
+        if final_state.get("error"):
+            logger.error(f"Evaluation workflow failed: {final_state['error']}")
+            raise LLMProviderError(f"Evaluation failed: {final_state['error']}")
+
+        # Extract fitment result
+        fitment_result = final_state.get("fitment_result")
+        if not fitment_result:
+            raise LLMProviderError("Fitment result not produced by workflow")
+
+        # Build Evaluation Response
         return EvaluationResponse(
             application_id=request.application_id,
             fitment_score=fitment_result.overall_score * 100,  # Convert to percentage

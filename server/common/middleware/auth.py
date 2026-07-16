@@ -44,15 +44,12 @@ async def verify_service_token(
                     "user_id": claims.get("sub"),
                     "auth_method": "jwt"
                 }
-            except jwt.ExpiredSignatureError:
+            except Exception as e:
+                # Catch all JWT errors - PyJWT version compatibility
+                error_msg = "Token has expired" if "expired" in str(e).lower() else f"Invalid token: {str(e)}"
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Token has expired"
-                )
-            except jwt.InvalidTokenError as e:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail=f"Invalid token: {str(e)}"
+                    detail=error_msg
                 )
         
         # Mode 2: Shared secret token
