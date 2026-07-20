@@ -105,9 +105,34 @@ class ResumeParserService:
         if start_idx == -1 or end_idx == 0:
             raise ValueError("No JSON object found in response")
         return json.loads(response_text[start_idx:end_idx])
+    
+    def _get_default_response(self) -> Dict[str, Any]:
+        """Return a default response structure when parsing fails completely."""
+        return {
+            "personal_info": {
+                "full_name": {"value": None, "confidence": 0.0},
+                "email": {"value": None, "confidence": 0.0},
+                "phone": {"value": None, "confidence": 0.0},
+                "location": {"value": None, "confidence": 0.0}
+            },
+            "experience": {
+                "total_years": {"value": 0.0, "confidence": 0.0},
+                "work_history": []
+            },
+            "education": [],
+            "skills": {
+                "skills": [],
+                "overall_confidence": 0.0
+            },
+            "needs_human_review": True,
+            "parsing_notes": "Failed to parse LLM response - requires manual review"
+        }
 
     def _parse_llm_response(self, response_text: str) -> Dict[str, Any]:
         """Parse the LLM response, retrying once with a JSON-only repair prompt."""
+        logger.info(f"Raw LLM response length: {len(response_text)}")
+        logger.info(f"Raw LLM response preview: {response_text[:500]}")
+        
         try:
             return self._extract_json(response_text)
         except (json.JSONDecodeError, ValueError) as initial_error:
@@ -116,10 +141,13 @@ class ResumeParserService:
             try:
                 repair_template = Template(self._load_prompt_template("json_repair.txt"))
                 repair_prompt = repair_template.render(malformed_response=response_text)
+                logger.info("Attempting JSON repair...")
                 repair_response = self.llm_client.chat_completion(
                     messages=[{"role": "user", "content": repair_prompt}],
                     temperature=0,
                 )
+                logger.info(f"Repair response length: {len(repair_response['content'])}")
+                logger.info(f"Repair response preview: {repair_response['content'][:500]}")
                 return self._extract_json(repair_response["content"])
             except Exception as repair_error:
                 logger.error(
@@ -127,9 +155,9 @@ class ResumeParserService:
                     initial_error,
                     repair_error,
                 )
-                raise LLMProviderError(
-                    f"Failed to parse LLM response: {initial_error}; JSON repair failed: {repair_error}"
-                ) from repair_error
+                # Return default structure instead of raising error
+                logger.warning("Returning default empty structure due to parsing failure")
+                return self._get_default_response()
     
     def _check_confidence_thresholds(self, parsed_data: Dict[str, Any]) -> bool:
         """
@@ -165,6 +193,23 @@ class ResumeParserService:
         education_data = parsed_data.get("education", [])
         skills_data = parsed_data.get("skills", {})
         
+        # Normalize education data - handle string graduation_year values like "Present"
+        normalized_education = []
+        for entry in education_data:
+            normalized_entry = entry.copy()
+            grad_year = normalized_entry.get("graduation_year")
+            if isinstance(grad_year, str):
+                # Convert "Present" or other non-numeric strings to None
+                if grad_year.lower() in ["present", "ongoing", "pursuing", "current"]:
+                    normalized_entry["graduation_year"] = None
+                else:
+                    # Try to parse as integer
+                    try:
+                        normalized_entry["graduation_year"] = int(grad_year)
+                    except (ValueError, TypeError):
+                        normalized_entry["graduation_year"] = None
+            normalized_education.append(normalized_entry)
+        
         return ParsedResumeResponse(
             id=resume_id,
             candidate_id=candidate_id,
@@ -178,7 +223,7 @@ class ResumeParserService:
                 total_years=ConfidenceField(**experience_data.get("total_years", {"value": None, "confidence": 0.0})),
                 work_history=[WorkHistoryEntry(**entry) for entry in experience_data.get("work_history", [])]
             ),
-            education=[EducationEntry(**entry) for entry in education_data],
+            education=[EducationEntry(**entry) for entry in normalized_education],
             skills=Skills(
                 skills=[SkillEntry(**skill) for skill in skills_data.get("skills", [])],
                 overall_confidence=skills_data.get("overall_confidence", 0.0)

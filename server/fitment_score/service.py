@@ -348,8 +348,17 @@ class FitmentScoreService:
         # Extract skills from parsed resume
         candidate_skills = [skill.skill_name for skill in parsed_resume.skills.skills]
         
-        # Extract experience years
-        candidate_experience_years = parsed_resume.experience.total_years.value or 0.0
+        # Extract experience years - handle None and string values
+        total_years_value = parsed_resume.experience.total_years.value
+        if total_years_value is None:
+            candidate_experience_years = 0.0
+        elif isinstance(total_years_value, str):
+            try:
+                candidate_experience_years = float(total_years_value)
+            except (ValueError, TypeError):
+                candidate_experience_years = 0.0
+        else:
+            candidate_experience_years = float(total_years_value)
         
         # Extract education
         candidate_education = [

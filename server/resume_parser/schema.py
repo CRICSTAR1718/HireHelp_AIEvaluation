@@ -24,7 +24,7 @@ class EducationEntry(BaseModel):
     institution: Optional[str] = None
     degree: Optional[str] = None
     field_of_study: Optional[str] = None
-    graduation_year: Optional[int] = None
+    graduation_year: Optional[int | str] = None  # Accept both int and strings like "Present"
     confidence: float = Field(ge=0.0, le=1.0)
 
 
