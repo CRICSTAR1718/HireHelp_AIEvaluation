@@ -181,13 +181,18 @@ class LLMClient:
         if total_tokens is None:
             total_tokens = (prompt_tokens or 0) + (completion_tokens or 0)
 
+        finish_reason = None
+        if getattr(response, "candidates", None):
+            finish_reason = str(response.candidates[0].finish_reason)
+
         return {
             "content": response.text,
             "token_usage": {
                 "prompt_tokens": prompt_tokens or 0,
                 "completion_tokens": completion_tokens or 0,
                 "total_tokens": total_tokens or 0
-            }
+            },
+            "finish_reason": finish_reason,
         }
     
     def _claude_completion(

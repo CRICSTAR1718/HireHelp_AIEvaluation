@@ -118,7 +118,13 @@ Respond in JSON format:
             for entry in resume.education:
                 text_parts.append(f"- {entry.get('degree')} in {entry.get('field_of_study')} from {entry.get('institution')}")
         
-        return "\n".join(text_parts)
+        structured_summary = "\n".join(text_parts)
+
+        if (not resume.work_history and not resume.education and not resume.skills) and resume.raw_text:
+            logger.warning(f"Structured fields empty for resume {resume_id}, falling back to raw_text for screening")
+            return resume.raw_text[:6000]
+
+        return structured_summary
     
     def _parse_llm_response(self, response_text: str) -> Dict[str, Any]:
         """Parse the LLM JSON response."""

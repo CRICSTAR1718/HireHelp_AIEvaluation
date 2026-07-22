@@ -97,7 +97,16 @@ class FitmentScore(Base):
     education_reasoning = Column(Text)
     culture_fit_score = Column(Float)
     culture_fit_reasoning = Column(Text)
-    
+
+    # Candidate-facing summary
+    strengths = Column(JSON, default=list)
+    weaknesses = Column(JSON, default=list)
+    recommendations = Column(Text)
+    fit_verdict = Column(String)
+    consider_because = Column(JSON, default=list)
+    not_consider_because = Column(JSON, default=list)
+    suitable_roles = Column(JSON, default=list)
+
     # Scoring metadata
     scoring_model = Column(String)
     scoring_timestamp = Column(DateTime(timezone=True), server_default=func.now())

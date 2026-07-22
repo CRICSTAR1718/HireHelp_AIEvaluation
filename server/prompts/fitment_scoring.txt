@@ -29,6 +29,12 @@ Evaluate across the following dimensions:
    - Are there any red flags or concerns?
    - Does their experience suggest cultural alignment?
 
+Candidate Summary (for HR/hiring manager consumption):
+fit_verdict: classify as "strong_fit", "moderate_fit", or "weak_fit"
+consider_because: 2-4 short, specific bullet points on why this candidate MAY be considered for this role
+not_consider_because: 2-4 short, specific bullet points on why this candidate may NOT be considered (empty list if none apply)
+suitable_roles: 1-4 other role titles or role types (based on skills/experience/trajectory) this candidate would be a good fit for, even if different from the role they applied to
+
 CRITICAL REQUIREMENT:
 - You MUST provide detailed reasoning for each dimension score
 - You MUST provide an overall reasoning summary
@@ -56,8 +62,18 @@ Respond in JSON format:
   
   "culture_fit_score": 0.80,
   "culture_fit_reasoning": "Career progression shows steady growth and alignment...",
-  
+
   "strengths": ["Strong technical background", "Relevant industry experience"],
   "weaknesses": ["Missing experience with specific technology X"],
-  "recommendations": "Consider for interview, focus on assessing knowledge of X"
+  "recommendations": "Consider for interview, focus on assessing knowledge of X",
+
+  "fit_verdict": "moderate_fit",
+  "consider_because": [
+    "5 years of relevant backend experience matching the seniority level required",
+    "Strong overlap in required skills (8/10)"
+  ],
+  "not_consider_because": [
+    "No prior experience with the specific cloud platform used by this team"
+  ],
+  "suitable_roles": ["Backend Engineer", "Platform Engineer"]
 }

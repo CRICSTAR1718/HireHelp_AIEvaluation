@@ -3,6 +3,14 @@ from typing import Optional, List
 from datetime import datetime
 
 
+class AIEvaluationSummary(BaseModel):
+    """Candidate-facing AI evaluation summary."""
+    fit_verdict: str
+    consider_because: List[str] = []
+    not_consider_because: List[str] = []
+    suitable_roles: List[str] = []
+
+
 class CalculateFitmentRequest(BaseModel):
     """Request to calculate fitment score."""
     candidate_id: str
@@ -48,7 +56,12 @@ class FitmentScoreResponse(BaseModel):
     strengths: List[str]
     weaknesses: List[str]
     recommendations: str
-    
+
+    fit_verdict: Optional[str] = None
+    consider_because: List[str] = []
+    not_consider_because: List[str] = []
+    suitable_roles: List[str] = []
+
     scoring_model: str
     scoring_timestamp: datetime
     scoring_duration_ms: int

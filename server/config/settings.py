@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "gpt-4"
     LLM_TEMPERATURE: float = 0.7
     LLM_MAX_TOKENS: int = 2000
+    LLM_MAX_TOKENS_RESUME_PARSING: int = 8000
     LLM_TIMEOUT: int = 60
     
     # Embeddings

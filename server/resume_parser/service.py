@@ -25,6 +25,7 @@ class ResumeParserService:
     def __init__(self):
         self.llm_client = LLMClient()
         self.confidence_threshold = settings.CONFIDENCE_THRESHOLD
+        self._last_prompt = None
     
     def _load_prompt_template(self, prompt_name: str = "resume_parsing.txt") -> str:
         """Load a prompt template from the prompts directory."""
@@ -80,7 +81,12 @@ class ResumeParserService:
                 
                 extracted_text = "\n".join(text_parts)
                 
+                logger.info(f"DEBUG: Extracted text length: {len(extracted_text)} characters")
+                logger.info(f"DEBUG: Extracted text preview (first 1000 chars): {extracted_text[:1000]}")
+                logger.info(f"DEBUG: Extracted text preview (last 500 chars): {extracted_text[-500:]}")
+                
                 if not extracted_text or len(extracted_text.strip()) < 50:
+                    logger.error(f"DEBUG: Extracted text is too short or empty. Length: {len(extracted_text) if extracted_text else 0}")
                     raise LLMProviderError(
                         f"Extracted text is too short or empty. The file may be corrupt or image-based PDF."
                     )
@@ -128,16 +134,37 @@ class ResumeParserService:
             "parsing_notes": "Failed to parse LLM response - requires manual review"
         }
 
-    def _parse_llm_response(self, response_text: str) -> Dict[str, Any]:
+    def _parse_llm_response(self, response_text: str, finish_reason: Optional[str] = None) -> Dict[str, Any]:
         """Parse the LLM response, retrying once with a JSON-only repair prompt."""
-        logger.info(f"Raw LLM response length: {len(response_text)}")
-        logger.info(f"Raw LLM response preview: {response_text[:500]}")
-        
+        logger.info(f"DEBUG: _parse_llm_response called with response_text length: {len(response_text)}, finish_reason={finish_reason}")
+        logger.info(f"DEBUG: Full raw response text: {response_text}")
+
+        truncated = bool(finish_reason) and "MAX_TOKENS" in finish_reason.upper()
+
+        if truncated:
+            logger.warning(
+                "Resume parsing response truncated by Gemini (finish_reason=%s), retrying with larger max_tokens",
+                finish_reason,
+            )
+            try:
+                retry_response = self.llm_client.chat_completion(
+                    messages=[{"role": "user", "content": self._last_prompt}],
+                    max_tokens=settings.LLM_MAX_TOKENS_RESUME_PARSING * 2,
+                )
+                if retry_response.get("finish_reason") and "MAX_TOKENS" in retry_response["finish_reason"].upper():
+                    logger.error("Still truncated after retry with doubled max_tokens — resume content likely too large")
+                return self._extract_json(retry_response["content"])
+            except Exception as retry_error:
+                logger.error("Retry after truncation failed: %s", retry_error)
+                return self._get_default_response()
+
         try:
-            return self._extract_json(response_text)
+            parsed = self._extract_json(response_text)
+            logger.info(f"DEBUG: Successfully parsed JSON. Keys: {list(parsed.keys())}")
+            return parsed
         except (json.JSONDecodeError, ValueError) as initial_error:
             logger.warning("Malformed JSON from resume parser LLM: %s", initial_error)
-
+            logger.error(f"DEBUG: JSON parsing failed. Error type: {type(initial_error).__name__}, Error: {initial_error}")
             try:
                 repair_template = Template(self._load_prompt_template("json_repair.txt"))
                 repair_prompt = repair_template.render(malformed_response=response_text)
@@ -145,17 +172,15 @@ class ResumeParserService:
                 repair_response = self.llm_client.chat_completion(
                     messages=[{"role": "user", "content": repair_prompt}],
                     temperature=0,
+                    max_tokens=settings.LLM_MAX_TOKENS_RESUME_PARSING,
                 )
                 logger.info(f"Repair response length: {len(repair_response['content'])}")
-                logger.info(f"Repair response preview: {repair_response['content'][:500]}")
                 return self._extract_json(repair_response["content"])
             except Exception as repair_error:
                 logger.error(
                     "Failed to parse LLM response after JSON repair: initial=%s repair=%s",
-                    initial_error,
-                    repair_error,
+                    initial_error, repair_error,
                 )
-                # Return default structure instead of raising error
                 logger.warning("Returning default empty structure due to parsing failure")
                 return self._get_default_response()
     
@@ -300,14 +325,27 @@ class ResumeParserService:
             template_str = self._load_prompt_template()
             template = Template(template_str)
             prompt = template.render(resume_text=raw_text)
+            self._last_prompt = prompt
+            
+            logger.info(f"DEBUG: Generated prompt length: {len(prompt)} characters")
+            logger.info(f"DEBUG: Generated prompt preview (first 500 chars): {prompt[:500]}")
+            logger.info(f"DEBUG: Resume text in prompt length: {len(raw_text)} characters")
             
             # Call LLM
+            logger.info(f"DEBUG: Calling LLM with max_tokens={settings.LLM_MAX_TOKENS_RESUME_PARSING}")
             llm_response = self.llm_client.chat_completion(
-                messages=[{"role": "user", "content": prompt}]
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=settings.LLM_MAX_TOKENS_RESUME_PARSING,
             )
+            logger.info(f"DEBUG: LLM response received. Content length: {len(llm_response.get('content', ''))}")
+            logger.info(f"DEBUG: LLM finish_reason: {llm_response.get('finish_reason')}")
+            logger.info(f"DEBUG: Raw LLM response preview (first 500 chars): {llm_response.get('content', '')[:500]}")
             
             # Parse LLM response
-            parsed_data = self._parse_llm_response(llm_response["content"])
+            parsed_data = self._parse_llm_response(
+                llm_response["content"],
+                finish_reason=llm_response.get("finish_reason"),
+            )
             
             # Check confidence thresholds
             needs_review = self._check_confidence_thresholds(parsed_data)

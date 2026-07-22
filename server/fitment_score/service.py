@@ -102,6 +102,14 @@ class FitmentScoreService:
         
         return self._parse_llm_response(llm_response["content"]), llm_response["token_usage"]
     
+    def _validate_fit_verdict(self, verdict: str) -> str:
+        """Validate that fit_verdict is one of the allowed values."""
+        allowed_verdicts = {"strong_fit", "moderate_fit", "weak_fit"}
+        if verdict in allowed_verdicts:
+            return verdict
+        logger.warning(f"Invalid fit_verdict '{verdict}' from LLM, defaulting to 'moderate_fit'")
+        return "moderate_fit"
+
     def _parse_llm_response(self, response_text: str) -> Dict[str, Any]:
         """Parse the LLM JSON response."""
         try:
@@ -119,7 +127,11 @@ class FitmentScoreService:
                 "overall_reasoning": "LLM reasoning unavailable",
                 "strengths": [],
                 "weaknesses": [],
-                "recommendations": "Proceed with human review"
+                "recommendations": "Proceed with human review",
+                "fit_verdict": "moderate_fit",
+                "consider_because": [],
+                "not_consider_because": [],
+                "suitable_roles": [],
             }
     
     def _convert_to_schema(
@@ -157,6 +169,10 @@ class FitmentScoreService:
             strengths=llm_enhancement.get("strengths", []),
             weaknesses=llm_enhancement.get("weaknesses", []),
             recommendations=llm_enhancement.get("recommendations", "No specific recommendations"),
+            fit_verdict=self._validate_fit_verdict(llm_enhancement.get("fit_verdict", "moderate_fit")),
+            consider_because=llm_enhancement.get("consider_because", []),
+            not_consider_because=llm_enhancement.get("not_consider_because", []),
+            suitable_roles=llm_enhancement.get("suitable_roles", []),
             scoring_model=scoring_metadata.get("model"),
             scoring_timestamp=scoring_metadata.get("timestamp"),
             scoring_duration_ms=scoring_metadata.get("duration_ms"),
@@ -185,6 +201,13 @@ class FitmentScoreService:
             db_score.education_reasoning = fitment_response.education_reasoning
             db_score.culture_fit_score = fitment_response.culture_fit_score
             db_score.culture_fit_reasoning = fitment_response.culture_fit_reasoning
+            db_score.strengths = fitment_response.strengths
+            db_score.weaknesses = fitment_response.weaknesses
+            db_score.recommendations = fitment_response.recommendations
+            db_score.fit_verdict = fitment_response.fit_verdict
+            db_score.consider_because = fitment_response.consider_because
+            db_score.not_consider_because = fitment_response.not_consider_because
+            db_score.suitable_roles = fitment_response.suitable_roles
             db_score.scoring_model = fitment_response.scoring_model
             db_score.scoring_duration_ms = fitment_response.scoring_duration_ms
             db_score.token_usage = fitment_response.token_usage
@@ -207,6 +230,13 @@ class FitmentScoreService:
                 education_reasoning=fitment_response.education_reasoning,
                 culture_fit_score=fitment_response.culture_fit_score,
                 culture_fit_reasoning=fitment_response.culture_fit_reasoning,
+                strengths=fitment_response.strengths,
+                weaknesses=fitment_response.weaknesses,
+                recommendations=fitment_response.recommendations,
+                fit_verdict=fitment_response.fit_verdict,
+                consider_because=fitment_response.consider_because,
+                not_consider_because=fitment_response.not_consider_because,
+                suitable_roles=fitment_response.suitable_roles,
                 scoring_model=fitment_response.scoring_model,
                 scoring_duration_ms=fitment_response.scoring_duration_ms,
                 token_usage=fitment_response.token_usage
@@ -303,9 +333,13 @@ class FitmentScoreService:
                 education_reasoning=db_score.education_reasoning,
                 culture_fit_score=db_score.culture_fit_score,
                 culture_fit_reasoning=db_score.culture_fit_reasoning,
-                strengths=[],
-                weaknesses=[],
-                recommendations="",
+                strengths=db_score.strengths or [],
+                weaknesses=db_score.weaknesses or [],
+                recommendations=db_score.recommendations or "",
+                fit_verdict=db_score.fit_verdict,
+                consider_because=db_score.consider_because or [],
+                not_consider_because=db_score.not_consider_because or [],
+                suitable_roles=db_score.suitable_roles or [],
                 scoring_model=db_score.scoring_model,
                 scoring_timestamp=db_score.scoring_timestamp,
                 scoring_duration_ms=db_score.scoring_duration_ms or 0,
